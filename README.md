@@ -1,3 +1,20 @@
+<div style="width:260px; height:100px; overflow:hidden; border-radius:8px;">
+  <img src="./logo.png"
+       style="width:100%; height:auto; object-fit:cover; object-position:center 50%;" />
+</div>
+
+<p align="center">
+<div style="width:260px; height:100px; overflow:hidden; border-radius:8px;">
+  <img src="./logo.png"
+       style="width:100%; height:auto; object-fit:cover; object-position:center 50%;" />
+</div>
+
+<p align="center">
+  <a href="https://pypi.org/project/jobcurator/"><img src="https://img.shields.io/pypi/v/jobcurator.svg" alt="PyPI Version"></a>
+  <a href="https://pypi.org/project/jobcurator/"><img src="https://img.shields.io/pypi/pyversions/jobcurator.svg" alt="Python Versions"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License"></a>
+</p>
+
 # HrTech ETL (WIP)
 
 Opensource ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM, Jobboard, and HCM** systems.
@@ -154,12 +171,12 @@ last_job_cursor = pull_jobs(
 You can build **pre-filters** using the expression helpers and metadata on the Pydantic models:
 
 ```python
-from hrtech_etl.core.expressions import field
+from hrtech_etl.core.expressions import Prefilter
 from hrtech_etl.connectors.warehouse_a.models import WarehouseAJob
 
 where_jobs = [
-    field(WarehouseAJob, "job_title").contains("engineer"),
-    field(WarehouseAJob, "created_on").gte(my_date),
+    Prefilter(WarehouseAJob, "job_title").contains("engineer"),
+    Prefilter(WarehouseAJob, "created_on").gte(my_date),
 ]
 
 last_job_cursor = pull_jobs(
