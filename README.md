@@ -418,7 +418,6 @@ Planned / in-progress:
 * [ ] Add push pipeline ui to playground
 * [ ] Add push pipeline Worker to api
 * [ ] Add push pipeline Worker to playground
-
 * [ ] Tighten connector implementations (real HTTP/DB clients)
 * [ ] Improve type coercion for filters (dates, ints, enums)
 * [ ] Add more warehouse templates (ATS / CRM / Jobboard / HCM)
@@ -429,4 +428,4 @@ Planned / in-progress:
 
 ## License
 
-TBD (MIT is a good default).
+MIT Licence.
