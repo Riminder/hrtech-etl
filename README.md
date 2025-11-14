@@ -37,7 +37,7 @@ Opensource ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM
 - 🧩 **UnifiedJob / UnifiedProfile** as optional normalized layer
 - 🔄 **Cursor-based incremental sync** (ID / created_at / updated_at)
 - 🎛️ **Pre-filtering** (WHERE at origin) using a typed `Condition` model
-- 🎚️ **Post-filtering** (in-memory) on formatted objects
+- 🎚️ **Post-filtering** (in-memory) on native origin objects
 - 🧬 **Formatter functions**:
   - native→native (WarehouseAJob → WarehouseBJob)
   - native→unified and unified→native
