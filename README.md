@@ -92,6 +92,14 @@ def run_job_pull_with_formatter_id(origin, target, formatter_id: str):
     )
 ```
 
+Launch the app with API or PLAYGROUND Modes
+
+```python
+HRTECH_ETL_MODE=api uvicorn app.main:app --reload
+HRTECH_ETL_MODE=playground uvicorn app.main:app --reload
+HRTECH_ETL_MODE=both uvicorn app.main:app --reload
+
+
 
 ## Repository Structure
 
