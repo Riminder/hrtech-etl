@@ -246,13 +246,13 @@ app = create_app()
 
 ```bash
 # API only (JSON endpoints under /api)
-HRTECH_ETL_MODE=api uvicorn app.main:app --reload
+mode=api uvicorn app.main:app --reload
 
 # Playground only (HTML UI at /playground)
-HRTECH_ETL_MODE=playground uvicorn app.main:app --reload
+mode=playground uvicorn app.main:app --reload
 
 # Both API + Playground
-HRTECH_ETL_MODE=both uvicorn app.main:app --reload
+mode=both uvicorn app.main:app --reload
 ```
 
 * API mode: use endpoints like `/api/connectors`, `/api/schema/{connector}/job`, `/api/run/job-pull`, `/api/formatters/build`.
