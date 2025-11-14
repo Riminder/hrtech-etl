@@ -14,7 +14,7 @@ class WarehouseAJob(BaseModel):
         "created_at" -> created_at-based cursor
         "updated_at" -> updated_at-based cursor
 
-    - json_schema_extra["filter"] encodes whether the field is usable in WHERE
+    - json_schema_extra["prefilter"] encodes whether the field is usable in WHERE
       conditions and which operators are allowed.
     """
 
@@ -22,8 +22,7 @@ class WarehouseAJob(BaseModel):
         ...,
         json_schema_extra={
             "cursor": "id",
-            "filter": {
-                "eligible": True,
+            "prefilter": {
                 "operators": ["eq", "in"],  # allowed operators for where clauses
             },
         },
@@ -32,8 +31,7 @@ class WarehouseAJob(BaseModel):
     job_title: str = Field(
         ...,
         json_schema_extra={
-            "filter": {
-                "eligible": True,
+            "prefilter": {
                 "operators": ["eq", "contains"],
             },
         },
@@ -42,8 +40,7 @@ class WarehouseAJob(BaseModel):
     status: str = Field(
         "open",
         json_schema_extra={
-            "filter": {
-                "eligible": True,
+            "prefilter": {
                 "operators": ["eq", "in"],
             },
         },
@@ -52,8 +49,7 @@ class WarehouseAJob(BaseModel):
     location: Optional[str] = Field(
         None,
         json_schema_extra={
-            "filter": {
-                "eligible": True,
+            "prefilter": {
                 "operators": ["eq", "contains"],
             },
         },
@@ -63,8 +59,7 @@ class WarehouseAJob(BaseModel):
         ...,
         json_schema_extra={
             "cursor": "updated_at",
-            "filter": {
-                "eligible": True,
+            "prefilter": {
                 "operators": ["eq", "gt", "gte", "lt", "lte"],
             },
         },
@@ -74,8 +69,7 @@ class WarehouseAJob(BaseModel):
         ...,
         json_schema_extra={
             "cursor": "created_at",
-            "filter": {
-                "eligible": True,
+            "prefilter": {
                 "operators": ["eq", "gt", "gte", "lt", "lte"],
             },
         },
@@ -88,15 +82,14 @@ class WarehouseAJob(BaseModel):
 class WarehouseAProfile(BaseModel):
     """
     Native PROFILE model for Warehouse A.
-    Similar approach: cursor + filter metadata on relevant fields.
+    Similar approach: cursor + prefilter metadata on relevant fields.
     """
 
     profile_id: str = Field(
         ...,
         json_schema_extra={
             "cursor": "id",
-            "filter": {
-                "eligible": True,
+            "prefilter": {
                 "operators": ["eq", "in"],
             },
         },
@@ -105,8 +98,7 @@ class WarehouseAProfile(BaseModel):
     full_name: str = Field(
         ...,
         json_schema_extra={
-            "filter": {
-                "eligible": True,
+            "prefilter": {
                 "operators": ["eq", "contains"],
             },
         },
@@ -115,8 +107,7 @@ class WarehouseAProfile(BaseModel):
     email: Optional[str] = Field(
         None,
         json_schema_extra={
-            "filter": {
-                "eligible": True,
+            "prefilter": {
                 "operators": ["eq", "in", "contains"],
             },
         },
@@ -126,8 +117,7 @@ class WarehouseAProfile(BaseModel):
         ...,
         json_schema_extra={
             "cursor": "updated_at",
-            "filter": {
-                "eligible": True,
+            "prefilter": {
                 "operators": ["eq", "gt", "gte", "lt", "lte"],
             },
         },
@@ -137,8 +127,7 @@ class WarehouseAProfile(BaseModel):
         ...,
         json_schema_extra={
             "cursor": "created_at",
-            "filter": {
-                "eligible": True,
+            "prefilter": {
                 "operators": ["eq", "gt", "gte", "lt", "lte"],
             },
         },
@@ -147,8 +136,7 @@ class WarehouseAProfile(BaseModel):
     current_position: Optional[str] = Field(
         None,
         json_schema_extra={
-            "filter": {
-                "eligible": True,
+            "prefilter": {
                 "operators": ["eq", "contains"],
             },
         },

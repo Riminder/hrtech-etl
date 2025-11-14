@@ -29,10 +29,6 @@ def export_model_fields(
       ...
     ]
     """
-    fields_map = getattr(model_cls, "model_fields", None) or getattr(
-        model_cls, "__fields__", {}
-    )
-
     result: List[Dict[str, Any]] = []
 
     for name, f in fields_map.items():
@@ -46,26 +42,22 @@ def export_model_fields(
             extra = getattr(f.field_info, "extra", None)
         extra = extra or {}
 
-        filter_meta = extra.get("filter")
+        prefilter_meta = extra.get("prefilter")
 
-        # When filterable_only=True, skip fields that are not eligible
-        if filterable_only:
-            if not filter_meta:
-                continue
-            if not filter_meta.get("eligible", False):
-                continue
+        # if we only want prefilterable fields, keep those that have a prefilter block
+        if filterable_only and not prefilter_meta:
+            continue
 
         field_info: Dict[str, Any] = {
             "name": name,
-            "type": py_type,  # "str", "datetime", etc.
+            "type": py_type,
         }
 
-        # Bubble up useful metadata (cursor/filter/anything else you put there)
         if "cursor" in extra:
             field_info["cursor"] = extra["cursor"]
 
-        if filter_meta:
-            field_info["filter"] = filter_meta
+        if prefilter_meta:
+            field_info["prefilter"] = prefilter_meta  # no 'eligible' anymore
 
         result.append(field_info)
 

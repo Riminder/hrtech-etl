@@ -30,8 +30,6 @@ class WarehouseARequests(BaseRequests):
         cursor: Cursor,
         limit: int,
     ) -> Tuple[List[WarehouseAProfile], Cursor]:
-        self._record_request()
-        self._record_request()
         resp = self._request(
             "GET",
             "/profiles",
@@ -42,13 +40,11 @@ class WarehouseARequests(BaseRequests):
 
     @single_request
     def upsert_jobs(self, jobs: List[WarehouseAJob]) -> None:
-        self._record_request()
         payload = [j.__dict__ for j in jobs]
         self._request("POST", "/jobs/bulk_upsert", json=payload)
 
     @single_request
     def upsert_profiles(self, profiles: List[WarehouseAProfile]) -> None:
-        self._record_request()
         payload = [p.__dict__ for p in profiles]
         self._request("POST", "/profiles/bulk_upsert", json=payload)
 
