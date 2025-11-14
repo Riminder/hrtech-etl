@@ -1,9 +1,13 @@
 # hrtech_etl/core/pipeline.py
 from typing import Any, Callable, List, Optional
 
-from .types import FilterFn, CursorMode
+from .types import FilterFn, CursorMode,Condition
 from .connector import BaseConnector
 from .utils import get_cursor_value
+
+from pydantic import BaseModel
+from importlib import import_module
+from .registry import get_connector_instance
 
 
 def _apply_filters(items: List[Any], filters: Optional[List[FilterFn]]) -> List[Any]:
@@ -59,3 +63,37 @@ def pull_jobs(
             break
 
     return last_cursor_value
+
+class JobPullConfig(BaseModel):
+    origin: str              # connector name, e.g. "warehouse_a"
+    target: str              # connector name, e.g. "warehouse_b"
+    cursor_mode: CursorMode
+    where: List[Condition] = []
+    formatter: Optional[str] = None    # dotted path, e.g. "hrtech_etl.formatters.a_to_b.format_job"
+    batch_size: int = 1000
+    dry_run: bool = False
+    start_cursor: Any = None
+
+
+def _load_callable(path: str) -> Callable[..., Any]:
+    module_name, _, attr = path.rpartition(".")
+    module = import_module(module_name)
+    return getattr(module, attr)
+
+
+def run_job_pull_from_config(cfg: JobPullConfig) -> Any:
+    origin: BaseConnector = get_connector_instance(cfg.origin)
+    target: BaseConnector = get_connector_instance(cfg.target)
+
+    format_fn = _load_callable(cfg.formatter) if cfg.formatter else None
+
+    return pull_jobs(
+        origin=origin,
+        target=target,
+        cursor_mode=cfg.cursor_mode,
+        where=cfg.where,
+        format_fn=format_fn,
+        batch_size=cfg.batch_size,
+        dry_run=cfg.dry_run,
+        start_cursor=cfg.start_cursor,
+    )

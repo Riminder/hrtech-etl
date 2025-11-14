@@ -9,6 +9,37 @@ from ...core.models import UnifiedJob, UnifiedProfile
 from .models import WarehouseAJob, WarehouseAProfile
 from .actions import WarehouseAActions
 
+from hrtech_etl.core.registry import register_connector, ConnectorMeta
+
+
+from hrtech_etl.core.registry import register_connector, ConnectorMeta
+from hrtech_etl.core.types import WarehouseType
+
+
+# Optional: factory to build a default instance with some dummy auth
+def _build_default_connector() -> WarehouseAConnector:
+    from hrtech_etl.core.auth import ApiKeyAuth
+    auth = ApiKeyAuth("X-API-Key", "dummy")
+    actions = WarehouseAActions(client=None)  # inject your real client
+    return WarehouseAConnector(auth=auth, actions=actions)
+
+
+#TODO define a @classmethod on WarehouseAConnector:
+# @classmethod
+# def build_default(cls) -> "WarehouseAConnector": ...
+
+
+# Register for UI / config usage
+register_connector(
+    ConnectorMeta(
+        name="warehouse_a",
+        label="Warehouse A",
+        warehouse_type=WarehouseType.JOBBOARD,
+        job_model="hrtech_etl.connectors.warehouse_a.models.WarehouseAJob",
+        profile_model="hrtech_etl.connectors.warehouse_a.models.WarehouseAProfile",
+    )
+)
+
 
 class WarehouseAConnector(BaseConnector):
     job_native_cls = WarehouseAJob

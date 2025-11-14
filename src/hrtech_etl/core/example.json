@@ -1,0 +1,11 @@
+{
+  "origin": "warehouse_a",
+  "target": "warehouse_b",
+  "cursor_mode": "updated_at",
+  "where_jobs": [
+    { "field": "job_title", "op": "contains", "value": "engineer" },
+    { "field": "created_on", "op": "gte", "value": "2024-01-01T00:00:00Z" }
+  ],
+  "where_profiles": [],
+  "formatter": "a_to_b.format_job"
+}

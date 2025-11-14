@@ -61,6 +61,38 @@ def format_job(job: WarehouseAJob) -> WarehouseBJob: ...
 def format_profile(profile: WarehouseAProfile) -> WarehouseBProfile: ...
 ```
 
+Where conditions for pre-filerting
+
+```python
+from hrtech_etl.core.expressions import field
+where_jobs = [
+    field(WarehouseAJob, "job_title").contains("engineer"),
+    field(WarehouseAJob, "created_on").gte(my_date),
+]
+```
+
+Run Pipeline using JSON
+```python
+from hrtech_etl.core.pipeline import pull_jobs
+from hrtech_etl.core.types import CursorMode
+from hrtech_etl.formatters.base import build_mapping_formatter
+from app.main import FORMATTER_REGISTRY
+
+
+def run_job_pull_with_formatter_id(origin, target, formatter_id: str):
+    mapping = FORMATTER_REGISTRY[formatter_id]
+    format_fn = build_mapping_formatter(mapping)
+
+    return pull_jobs(
+        origin=origin,
+        target=target,
+        cursor_mode=CursorMode.UPDATED_AT,
+        format_fn=format_fn,
+        batch_size=5000,
+    )
+```
+
+
 ## Repository Structure
 
 ```bash
