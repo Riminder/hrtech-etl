@@ -9,7 +9,7 @@ from .types import CursorMode
 def single_request(fn):
     """
     Ensure that an action executes exactly ONE underlying request
-    via BaseActions._request().
+    via BaseRequests._request().
     """
     @wraps(fn)
     def wrapper(self, *args, **kwargs):

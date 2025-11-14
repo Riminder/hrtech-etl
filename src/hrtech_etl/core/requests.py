@@ -1,0 +1,62 @@
+# hrtech_etl/core/requests.py
+from typing import Any, Protocol
+
+
+class RequestClient(Protocol):
+    """
+    Protocol for clients that provide a 'request' method.
+    This ensures type checking for the client passed to BaseRequests.
+    """
+    def request(self, *args: Any, **kwargs: Any) -> Any:
+        ...
+
+
+class BaseRequests:
+    def __init__(self, client: RequestClient):
+        """
+        Initializes the BaseRequests with a client.
+        Base class for connector-specific request layers.
+
+        The client is expected to provide a 'request' method for I/O operations.
+        Examples include HTTP clients, DB clients, or SDKs.
+
+        Args:
+            client: An object conforming to the RequestClient protocol,
+                    providing a 'request' method.
+
+        It typically wraps an HTTP client or DB client and exposes:
+        - fetch_jobs(...)
+        - fetch_profiles(...)
+        - upsert_jobs(...)
+        - upsert_profiles(...)
+        while keeping track of low-level request counts, retries, etc.
+        """
+        self._client = client
+        self._request_count = 0
+
+    @property
+    def request_count(self) -> int:
+        """
+        Returns the number of requests made through this action instance.
+        """
+        return self._request_count
+
+    def _request(self, *args: Any, **kwargs: Any) -> Any:
+        """
+        Single low-level request entrypoint for I/O operations.
+
+        This method increments an internal request counter and delegates the
+        actual request execution to the underlying client's 'request' method.
+        Concrete action methods in subclasses should call ONLY this method for I/O.
+
+        Args:
+            *args: Positional arguments to pass to the client's request method.
+            **kwargs: Keyword arguments to pass to the client's request method.
+
+        Returns:
+            The result of the client's request method.
+        """
+        self._request_count += 1
+        return self._client.request(*args, **kwargs)
+
+

@@ -19,7 +19,7 @@ Opensource ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM
    - [Run Pipeline Using JSON / Mapping Formatter](#run-pipeline-using-json--mapping-formatter)  
 3. [FastAPI App: API vs Playground](#fastapi-app-api-vs-playground)  
 4. [Core Concepts](#core-concepts)  
-   - [Connectors & Actions](#connectors--actions)  
+   - [Connectors & Requests](#connectors--requests)  
    - [Native & Unified Models](#native--unified-models)  
    - [Cursor Modes](#cursor-modes)  
    - [Formatters](#formatters)  
@@ -68,8 +68,8 @@ from hrtech_etl.core.types import CursorMode
 from hrtech_etl.core.auth import ApiKeyAuth, BearerAuth
 from hrtech_etl.core.pipeline import pull_jobs, pull_profiles
 
-from hrtech_etl.connectors.warehouse_a import WarehouseAConnector, WarehouseAActions
-from hrtech_etl.connectors.warehouse_b import WarehouseBConnector, WarehouseBActions
+from hrtech_etl.connectors.warehouse_a import WarehouseAConnector, WarehouseARequests
+from hrtech_etl.connectors.warehouse_b import WarehouseBConnector, WarehouseBRequests
 
 from hrtech_etl.formatters import a_to_b
 
@@ -77,12 +77,12 @@ from hrtech_etl.formatters import a_to_b
 
 origin = WarehouseAConnector(
     auth=ApiKeyAuth("X-API-Key", "AAA"),
-    actions=WarehouseAActions(client_a),
+    requests=WarehouseARequests(client_a),
 )
 
 target = WarehouseBConnector(
     auth=BearerAuth("BBB"),
-    actions=WarehouseBActions(client_b),
+    requests=WarehouseBRequests(client_b),
 )
 
 # --- Sync JOBS: A -> B using formatter a_to_b.format_job ---
@@ -262,7 +262,7 @@ mode=both uvicorn app.main:app --reload
 
 ## Core Concepts
 
-### Connectors & Actions
+### Connectors & Requests
 
 * **BaseConnector** (`core/connector.py`):
 
@@ -274,9 +274,9 @@ mode=both uvicorn app.main:app --reload
 * **Warehouse connectors** (e.g. `connectors/warehouse_a`, `connectors/warehouse_b`):
 
   * Implement `BaseConnector` with warehouse-specific I/O logic.
-  * Use **Actions classes** to encapsulate HTTP/DB access:
+  * Use **Requests classes** to encapsulate HTTP/DB access:
 
-    * `WarehouseAActions`, `WarehouseBActions`, etc.
+    * `WarehouseARequests`, `WarehouseBRequests`, etc.
 
 ### Native & Unified Models
 
@@ -362,7 +362,7 @@ hrtech-etl/
 │     │  ├─ types.py         # WarehouseType, CursorMode, Condition, Operator, FilterFn
 │     │  ├─ models.py        # UnifiedJob, UnifiedProfile (Pydantic)
 │     │  ├─ connector.py     # BaseConnector (jobs + profiles, Pydantic-native)
-│     │  ├─ actions.py       # BaseActions (wraps low-level client, tracks _request_count)
+│     │  ├─ requests.py       # BaseRequests (wraps low-level client, tracks _request_count)
 │     │  ├─ utils.py         # single_request, get_cursor_value, shared helpers
 │     │  ├─ expressions.py   # field(...) helpers to build Condition objects
 │     │  ├─ ui_schema.py     # export_model_fields for UI (fields, filter metadata, cursors)
@@ -375,13 +375,13 @@ hrtech-etl/
 │     │  ├─ warehouse_a/
 │     │  │  ├─ __init__.py   # WarehouseAConnector + registry registration
 │     │  │  ├─ models.py     # WarehouseAJob, WarehouseAProfile (Pydantic, cursor metadata, filter meta)
-│     │  │  ├─ actions.py    # WarehouseAActions (HTTP/DB client)
+│     │  │  ├─ requests.py   # WarehouseARequests (HTTP/DB client)
 │     │  │  └─ test.py       # tests for this connector
 │     │  │
 │     │  └─ warehouse_b/
 │     │     ├─ __init__.py   # WarehouseBConnector + registry registration
 │     │     ├─ models.py     # WarehouseBJob, WarehouseBProfile
-│     │     ├─ actions.py    # WarehouseBActions
+│     │     ├─ requests.py   # WarehouseBRequests
 │     │     └─ test.py       # tests for this connector
 │     │
 │     └─ formatters/

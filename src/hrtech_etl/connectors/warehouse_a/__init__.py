@@ -7,7 +7,7 @@ from ...core.auth import BaseAuth
 from ...core.types import WarehouseType, CursorMode
 from ...core.models import UnifiedJob, UnifiedProfile
 from .models import WarehouseAJob, WarehouseAProfile
-from .actions import WarehouseAActions
+from .requests import WarehouseARequests
 
 from hrtech_etl.core.registry import register_connector, ConnectorMeta
 
@@ -15,18 +15,8 @@ from hrtech_etl.core.registry import register_connector, ConnectorMeta
 from hrtech_etl.core.registry import register_connector, ConnectorMeta
 from hrtech_etl.core.types import WarehouseType
 
+from hrtech_etl.core.auth import ApiKeyAuth
 
-# Optional: factory to build a default instance with some dummy auth
-def _build_default_connector() -> WarehouseAConnector:
-    from hrtech_etl.core.auth import ApiKeyAuth
-    auth = ApiKeyAuth("X-API-Key", "dummy")
-    actions = WarehouseAActions(client=None)  # inject your real client
-    return WarehouseAConnector(auth=auth, actions=actions)
-
-
-#TODO define a @classmethod on WarehouseAConnector:
-# @classmethod
-# def build_default(cls) -> "WarehouseAConnector": ...
 
 
 # Register for UI / config usage
@@ -45,13 +35,13 @@ class WarehouseAConnector(BaseConnector):
     job_native_cls = WarehouseAJob
     profile_native_cls = WarehouseAProfile
 
-    def __init__(self, auth: BaseAuth, actions: WarehouseAActions):
+    def __init__(self, auth: BaseAuth, requests: WarehouseARequests):
         super().__init__(
             auth=auth,
             name="warehouse_a",
             warehouse_type=WarehouseType.JOBBOARD,
         )
-        self.actions = actions
+        self.requests = requests
 
     def read_jobs_batch(
         self,
@@ -101,3 +91,15 @@ class WarehouseAConnector(BaseConnector):
         )
 
     # read_profiles_batch, _write_profiles_native, to_unified_profile, from_unified_profile similar...
+
+
+# Optional: factory to build a default instance with some dummy auth
+def _build_default_connector() -> WarehouseAConnector:
+    auth = ApiKeyAuth("X-API-Key", "dummy")
+    requests = WarehouseARequests(client=None)  # inject your real client
+    return WarehouseAConnector(auth=auth, requests=requests)
+
+
+#TODO define a @classmethod on WarehouseAConnector:
+# @classmethod
+# def build_default(cls) -> "WarehouseAConnector": ...
