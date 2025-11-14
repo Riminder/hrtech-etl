@@ -1,4 +1,3 @@
-````markdown
 # HrTech ETL (WIP)
 
 Opensource ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM, Jobboard, and HCM** systems.
