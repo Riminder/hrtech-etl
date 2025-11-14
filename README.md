@@ -60,17 +60,6 @@ Opensource ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM
 
 ---
 
-## TODO
-- NativeFilersFn to post-filter native resource from Origin Wharehouse
-- Add pull_profiles logic to api
-- Add pull_profiles logic to playground
-- Add pull pipeline Worker to api
-- Add pull pipeline Worker to playground
-- Add push pipeline logic to api
-- Add push pipeline ui to playground
-- Add push pipeline Worker to api
-- Add push pipeline Worker to playground
-
 ## Quick Start (Python)
 
 ### Basic Jobs & Profiles Sync
@@ -419,6 +408,16 @@ hrtech-etl/
 > This is a **WIP** (work in progress).
 
 Planned / in-progress:
+## TODO
+* [ ] Add PostFilers to post-filter native resource from Origin Wharehouse
+* [ ] Add pull_profiles logic to api
+* [ ] Add pull_profiles logic to playground
+* [ ] Add pull pipeline Worker to api
+* [ ] Add pull pipeline Worker to playground
+* [ ] Add push pipeline logic to api
+* [ ] Add push pipeline ui to playground
+* [ ] Add push pipeline Worker to api
+* [ ] Add push pipeline Worker to playground
 
 * [ ] Tighten connector implementations (real HTTP/DB clients)
 * [ ] Improve type coercion for filters (dates, ints, enums)
