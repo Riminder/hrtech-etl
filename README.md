@@ -46,17 +46,18 @@ Opensource ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM
 
 - 🔌 **Warehouse Connectors** for ATS, CRM, Jobboard, HCM  
 - 🧱 **Pydantic-native models** per warehouse (jobs & profiles)
-- 🧩 **UnifiedJob / UnifiedProfile** as optional normalized layer
+- 🧬 Optional **UnifiedJob / UnifiedProfile** as a normalized layer
 - 🔄 **Cursor-based incremental sync** (ID / created_at / updated_at)
-- 🎛️ **Pre-filtering** (WHERE at origin) using a typed `Condition` model
-- 🎚️ **Post-filtering** (in-memory) on native origin objects
-- 🧬 **Formatter functions**:
-  - native→native (WarehouseAJob → WarehouseBJob)
-  - native→unified and unified→native
-  - no-code mapping formatter (built from UI)
+- 🎛️ **Prefilters** on origin (metadata-driven, via `prefilter` JSON schema on fields)
+- 🎚️ **Postfilters** in core on native origin objects (any field, richer operators)
+- 🧩 **Formatter functions**:
+  - explicit native→native (e.g. WarehouseAJob → WarehouseBJob)
+  - native→unified→native via connector hooks
+  - JSON-driven mapping formatters
 - 🌐 **FastAPI backend**:
   - `/api/...` JSON endpoints (connectors, schema, run ETL, build formatter)
-  - `/playground` HTML UI to build mappings & filters without coding
+  - `/playground` HTML UI for no-code mapping + pre/post filters + cursor control
+
 
 ---
 
@@ -91,8 +92,8 @@ last_job_cursor = pull_jobs(
     origin=origin,
     target=target,
     cursor_mode=CursorMode.UPDATED_AT,  # or CREATED_AT / ID
-    format_fn=a_to_b.format_job,        # standard job formatter
-    batch_size=5000,
+    formatter=a_to_b.format_job,        # standard job formatter
+    limit=5000,
 )
 
 # --- Sync PROFILES: A -> B using formatter a_to_b.format_profile ---
@@ -100,8 +101,8 @@ last_profile_cursor = pull_profiles(
     origin=origin,
     target=target,
     cursor_mode=CursorMode.UPDATED_AT,
-    format_fn=a_to_b.format_profile,
-    batch_size=5000,
+    formatter=a_to_b.format_profile,
+    limit=5000,
 )
 
 # You can store last_job_cursor / last_profile_cursor to resume on next run.
@@ -144,21 +145,21 @@ last_job_cursor = pull_jobs(
     origin=origin,
     target=target,
     cursor_mode=CursorMode.UPDATED_AT,
-    format_fn=format_job,
+    formatter=format_job,
 )
 ```
 
 ---
 
-### Where Conditions / Pre-filtering
+### Prefilters (origin WHERE)
 
-You can build **pre-filters** using the expression helpers and metadata on the Pydantic models:
+Prefilters are pushed down to the origin warehouse (SQL / HTTP WHERE), and are **metadata-driven** on the Pydantic models via `json_schema_extra["prefilter"]`.
 
 ```python
 from hrtech_etl.core.expressions import Prefilter
 from hrtech_etl.connectors.warehouse_a.models import WarehouseAJob
 
-where_jobs = [
+prefilters = [
     Prefilter(WarehouseAJob, "job_title").contains("engineer"),
     Prefilter(WarehouseAJob, "created_on").gte(my_date),
 ]
@@ -167,12 +168,46 @@ last_job_cursor = pull_jobs(
     origin=origin,
     target=target,
     cursor_mode=CursorMode.UPDATED_AT,
-    where=where_jobs,            # list[Condition]
-    format_fn=a_to_b.format_job,
+    cursor_start=None,
+    where=prefilters,  # prefilters → translated into origin query
+    formatter=a_to_b.format_job,
 )
 ```
 
 Each `Condition` is a typed object (`field`, `op`, `value`) that connectors translate into their own query parameters or SQL.
+
+```python
+job_title: str = Field(
+    ...,
+    json_schema_extra={
+        "prefilter": {
+            "operators": ["eq", "contains"],
+        },
+    },
+)
+```
+
+### Postfilters (origin HAVING)
+
+They can target any field and use all operators (no per-field metadata required).
+
+```python 
+from hrtech_etl.core.types import Condition, Operator
+
+postfilters = [
+    Condition(field="status", op=Operator.EQ, value="open"),
+    Condition(field="location", op=Operator.CONTAINS, value="Remote"),
+]
+
+last_job_cursor = pull_jobs(
+    origin=origin,
+    target=target,
+    cursor_mode=CursorMode.UPDATED_AT,
+    where=where_jobs,          # prefilters (optional)
+    having=postfilters,   # postfilters applied in-memory on native objects
+    format_fn=a_to_b.format_job,
+)
+```
 
 ---
 
@@ -190,14 +225,14 @@ from app.main import FORMATTER_REGISTRY
 def run_job_pull_with_formatter_id(origin, target, formatter_id: str):
     # formatter_id → stored mapping spec: [{"from": "job_title", "to": "title"}, ...]
     mapping = FORMATTER_REGISTRY[formatter_id]
-    format_fn = build_mapping_formatter(mapping)
+    formatter = build_mapping_formatter(mapping)
 
     return pull_jobs(
         origin=origin,
         target=target,
         cursor_mode=CursorMode.UPDATED_AT,
-        format_fn=format_fn,
-        batch_size=5000,
+        formatter=formatter,
+        limit=5000,
     )
 ```
 
@@ -360,7 +395,7 @@ hrtech-etl/
 │     ├─ core/
 │     │  ├─ __init__.py
 │     │  ├─ auth.py          # BaseAuth, ApiKeyAuth, TokenAuth, BearerAuth
-│     │  ├─ types.py         # WarehouseType, CursorMode, Condition, Operator, FilterFn
+│     │  ├─ types.py         # WarehouseType, CursorMode, Condition, Operator
 │     │  ├─ models.py        # UnifiedJob, UnifiedProfile (Pydantic)
 │     │  ├─ connector.py     # BaseConnector (jobs + profiles, Pydantic-native)
 │     │  ├─ requests.py       # BaseRequests (wraps low-level client, tracks _request_count)
@@ -409,19 +444,17 @@ hrtech-etl/
 
 Planned / in-progress:
 ## TODO
-* [ ] Add PostFilers to post-filter native resource from Origin Wharehouse
 * [ ] Add pull_profiles logic to api
 * [ ] Add pull_profiles logic to playground
-* [ ] Add pull pipeline Worker to api
-* [ ] Add pull pipeline Worker to playground
 * [ ] Add push pipeline logic to api
 * [ ] Add push pipeline ui to playground
-* [ ] Add push pipeline Worker to api
+* [ ] Add pull pipeline Worker to playground
 * [ ] Add push pipeline Worker to playground
 * [ ] Tighten connector implementations (real HTTP/DB clients)
 * [ ] Improve type coercion for filters (dates, ints, enums)
 * [ ] Add more warehouse templates (ATS / CRM / Jobboard / HCM)
 * [ ] Persist formatters & configs (beyond in-memory registry)
+* [ ] add pydantic gateway : https://pydantic.dev/ai-gateway 
 * [ ] Add more tests & CI
 
 ---

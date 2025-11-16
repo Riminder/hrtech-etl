@@ -32,6 +32,9 @@ def build_mapping_formatter(
     and returns a dict where:
         data[dst] = getattr(origin_obj, src, None)
     """
+    if not mapping:
+        return None
+    
     # normalize once
     normalized: List[MappingSpec] = [
         {"from": m["from"], "to": m["to"]} for m in mapping

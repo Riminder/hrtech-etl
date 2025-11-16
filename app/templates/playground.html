@@ -1,0 +1,212 @@
+<!-- app/templates/playground.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>hrtech-etl Playground</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    fieldset { margin-bottom: 1.5rem; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 0.25rem 0.5rem; }
+    th { background-color: #f5f5f5; }
+  </style>
+</head>
+<body>
+  <h1>hrtech-etl Playground</h1>
+
+  <form method="post" action="/playground">
+    <input type="hidden" name="action" value="run" />
+
+    <!-- Connectors & Resource -->
+    <fieldset>
+      <legend>Connectors & Resource</legend>
+
+      <label>Origin:
+        <select name="origin">
+          {% for meta in connectors_meta %}
+            <option value="{{ meta.name }}"
+                    {% if meta.name == origin_name %}selected{% endif %}>
+              {{ meta.label }} ({{ meta.warehouse_type.value }})
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+
+      &nbsp;&nbsp;
+
+      <label>Target:
+        <select name="target">
+          {% for meta in connectors_meta %}
+            <option value="{{ meta.name }}"
+                    {% if meta.name == target_name %}selected{% endif %}>
+              {{ meta.label }} ({{ meta.warehouse_type.value }})
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+
+      &nbsp;&nbsp;
+
+      <label>Resource:
+        <select name="resource">
+          <option value="job" {% if resource == "job" %}selected{% endif %}>Job</option>
+          <option value="profile" {% if resource == "profile" %}selected{% endif %}>Profile</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <!-- Cursor -->
+    <fieldset>
+      <legend>Cursor</legend>
+      <label>Cursor mode:
+        <select name="cursor_mode">
+          <option value="">(default)</option>
+          <option value="id" {% if cursor_mode == "id" %}selected{% endif %}>ID</option>
+          <option value="created_at" {% if cursor_mode == "created_at" %}selected{% endif %}>created_at</option>
+          <option value="updated_at" {% if cursor_mode == "updated_at" %}selected{% endif %}>updated_at</option>
+        </select>
+      </label>
+      &nbsp;&nbsp;
+      <label>Cursor start:
+        <input type="text" name="cursor_start" value="{{ cursor_start or '' }}" />
+      </label>
+      &nbsp;&nbsp;
+      <label>Cursor end (last run):
+        <input type="text" value="{{ cursor_end or '' }}" readonly />
+      </label>
+    </fieldset>
+
+    <!-- Mapping -->
+    <fieldset>
+      <legend>Mapping (Formatter)</legend>
+      <p>
+        Map origin fields to target fields. Empty rows are ignored.
+        If no mapping is provided, the pipeline will try origin-native → Unified → target-native.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Origin field</th><th>Target field</th></tr>
+        </thead>
+        <tbody>
+          {% for i in range(MAX_MAPPING_ROWS) %}
+            <tr>
+              <td>
+                <select name="mapping_from_{{ i }}">
+                  <option value="">--</option>
+                  {% for f in origin_fields %}
+                    <option value="{{ f.name }}">{{ f.name }} ({{ f.type }})</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <select name="mapping_to_{{ i }}">
+                  <option value="">--</option>
+                  {% for f in target_fields %}
+                    <option value="{{ f.name }}">{{ f.name }} ({{ f.type }})</option>
+                  {% endfor %}
+                </select>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </fieldset>
+
+    <!-- Pre-filters -->
+    <fieldset>
+      <legend>Pre-filters (origin WHERE)</legend>
+      <p>
+        Applied on origin objects, using per-field <code>prefilter</code> metadata (pushed down to the warehouse).
+      </p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Operator</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          {% for i in range(MAX_FILTER_ROWS) %}
+            <tr>
+              <td>
+                <select name="pre_field_{{ i }}">
+                  <option value="">--</option>
+                  {% for f in origin_prefilter_fields %}
+                    <option value="{{ f.name }}">{{ f.name }} ({{ f.type }})</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <select name="pre_op_{{ i }}">
+                  <option value="">--</option>
+                  <option value="eq">==</option>
+                  <option value="gte">&gt;=</option>
+                  <option value="lte">&lt;=</option>
+                  <option value="gt">&gt;</option>
+                  <option value="lt">&lt;</option>
+                  <option value="in">in (comma-separated)</option>
+                  <option value="contains">contains</option>
+                </select>
+              </td>
+              <td><input type="text" name="pre_value_{{ i }}" /></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </fieldset>
+
+    <!-- Post-filters -->
+    <fieldset>
+      <legend>Post-filters (core, after origin read)</legend>
+      <p>
+        Applied in core on native origin objects, after the read action.  
+        Any field can be used; all operators are allowed.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Operator</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          {% for i in range(MAX_FILTER_ROWS) %}
+            <tr>
+              <td>
+                <select name="post_field_{{ i }}">
+                  <option value="">--</option>
+                  {% for f in origin_postfilter_fields %}
+                    <option value="{{ f.name }}">{{ f.name }} ({{ f.type }})</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <select name="post_op_{{ i }}">
+                  <option value="">--</option>
+                  <option value="eq">==</option>
+                  <option value="gte">&gt;=</option>
+                  <option value="lte">&lt;=</option>
+                  <option value="gt">&gt;</option>
+                  <option value="lt">&lt;</option>
+                  <option value="in">in (comma-separated)</option>
+                  <option value="contains">contains</option>
+                </select>
+              </td>
+              <td><input type="text" name="post_value_{{ i }}" /></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </fieldset>
+
+    <button type="submit">Run ETL</button>
+  </form>
+
+  {% if result_summary %}
+    <div style="margin-top:1rem;padding:0.5rem;border:1px solid #0a0;">
+      <strong>{{ result_summary }}</strong>
+    </div>
+  {% endif %}
+
+  {% if error_message %}
+    <div style="margin-top:1rem;padding:0.5rem;border:1px solid #a00;color:#a00;">
+      <strong>{{ error_message }}</strong>
+    </div>
+  {% endif %}
+</body>
+</html>

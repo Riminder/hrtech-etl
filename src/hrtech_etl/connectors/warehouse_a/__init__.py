@@ -47,18 +47,18 @@ class WarehouseAConnector(BaseConnector):
         self,
         cursor: Cursor = None,
         cursor_mode: CursorMode = CursorMode.UPDATED_AT,
-        batch_size: int = 1000,
+        limit: int = 1000,
     ) -> Tuple[List[WarehouseAJob], Cursor]:
         # interpret cursor depending on mode
         if cursor_mode == CursorMode.UPDATED_AT:
             updated_after: Optional[datetime] = cursor
-            jobs = self.actions.fetch_jobs(updated_after=updated_after, limit=batch_size)
+            jobs = self.actions.fetch_jobs(updated_after=updated_after, limit=limit)
         elif cursor_mode == CursorMode.CREATED_AT:
             created_after: Optional[datetime] = cursor
-            jobs = self.actions.fetch_jobs(created_after=created_after, limit=batch_size)
+            jobs = self.actions.fetch_jobs(created_after=created_after, limit=limit)
         elif cursor_mode == CursorMode.ID:
             id_after: Optional[str] = cursor
-            jobs = self.actions.fetch_jobs(id_after=id_after, limit=batch_size)
+            jobs = self.actions.fetch_jobs(id_after=id_after, limit=limit)
         else:
             raise ValueError(f"Unsupported cursor mode: {cursor_mode}")
 

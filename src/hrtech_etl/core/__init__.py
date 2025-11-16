@@ -1,7 +1,7 @@
 from .pipeline import pull_jobs, pull_profiles
 from .models import UnifiedJob, UnifiedProfile
 from .auth import BaseAuth, ApiKeyAuth, TokenAuth, BearerAuth
-from .types import WarehouseType, FilterFn
+from .types import WarehouseType
 
 __all__ = [
     "pull_jobs",
@@ -13,5 +13,4 @@ __all__ = [
     "TokenAuth",
     "BearerAuth",
     "WarehouseType",
-    "FilterFn",
 ]

@@ -31,9 +31,9 @@ class BaseConnector(ABC):
     @abstractmethod
     def read_jobs_batch(
         self,
-        cursor: Cursor = None,
+        cursor_start: Cursor = None,
         cursor_mode: CursorMode = CursorMode.UPDATED_AT,
-        batch_size: int = 1000,
+        limit: int = 1000,
     ) -> Tuple[List[BaseModel], Cursor]:
         ...
 
@@ -73,7 +73,7 @@ class BaseConnector(ABC):
         self,
         cursor: Cursor = None,
         cursor_mode: CursorMode = CursorMode.UPDATED_AT,
-        batch_size: int = 1000,
+        limit: int = 1000,
     ) -> Tuple[List[BaseModel], Cursor]:
         ...
 
