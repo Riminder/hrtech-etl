@@ -449,12 +449,16 @@ hrtech-etl/
 
 Planned / in-progress:
 ## TODO
+* [ ] Add push_jobs pipeline logic to api
+* [ ] Add push_jobs pipeline ui to playground
 * [ ] Add pull_profiles logic to api
 * [ ] Add pull_profiles logic to playground
-* [ ] Add push pipeline logic to api
-* [ ] Add push pipeline ui to playground
+* [ ] Add push_profiles logic to api
+* [ ] Add push_profiles logic to playground
+* [ ] Add Customers' Connectors Public logic
+* [ ] Add Customers' Connectors Private logic
 * [ ] Add pull pipeline Worker to playground
-* [ ] Add push pipeline Worker to playground
+* [ ] Add push pipeline Hook to playground
 * [ ] Tighten connector implementations (real HTTP/DB clients)
 * [ ] Improve type coercion for filters (dates, ints, enums)
 * [ ] Add more warehouse templates (ATS / CRM / Jobboard / HCM)
