@@ -66,7 +66,7 @@ Opensource ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM
 ### Basic Jobs & Profiles Sync
 
 ```python
-from hrtech_etl.core.types import CursorMode
+from hrtech_etl.core.types import Cursor, CursorMode
 from hrtech_etl.core.auth import ApiKeyAuth, BearerAuth
 from hrtech_etl.core.pipeline import pull_jobs, pull_profiles
 
@@ -87,25 +87,30 @@ target = WarehouseBConnector(
     requests=WarehouseBRequests(client_b),
 )
 
+cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None)
+
+
 # --- Sync JOBS: A -> B using formatter a_to_b.format_job ---
-last_job_cursor = pull_jobs(
+cursor_jobs = pull_jobs(
     origin=origin,
     target=target,
-    cursor_mode=CursorMode.UPDATED_AT,  # or CREATED_AT / ID
+    cursor=cursor,
     formatter=a_to_b.format_job,        # standard job formatter
     limit=5000,
 )
+print("cursor_start:", cursor_jobs.start)
+print("cursor_end:", cursor_jobs.end)
 
 # --- Sync PROFILES: A -> B using formatter a_to_b.format_profile ---
-last_profile_cursor = pull_profiles(
+cursor = pull_profiles(
     origin=origin,
     target=target,
-    cursor_mode=CursorMode.UPDATED_AT,
+    cursor=cursor,
     formatter=a_to_b.format_profile,
     limit=5000,
 )
 
-# You can store last_job_cursor / last_profile_cursor to resume on next run.
+# You can store cursor_jobs.end / cursor_profiles.end to resume on next run.
 ````
 
 ---
@@ -141,10 +146,10 @@ def format_profile(profile: WarehouseAProfile) -> WarehouseBProfile:
 Then:
 
 ```python
-last_job_cursor = pull_jobs(
+cursor_jobs = pull_jobs(
     origin=origin,
     target=target,
-    cursor_mode=CursorMode.UPDATED_AT,
+    cursor=cursor,
     formatter=format_job,
 )
 ```
@@ -164,10 +169,10 @@ prefilters = [
     Prefilter(WarehouseAJob, "created_on").gte(my_date),
 ]
 
-last_job_cursor = pull_jobs(
+cursor_jobs = pull_jobs(
     origin=origin,
     target=target,
-    cursor_mode=CursorMode.UPDATED_AT,
+    cursor=cursor,
     cursor_start=None,
     where=prefilters,  # prefilters → translated into origin query
     formatter=a_to_b.format_job,
@@ -199,13 +204,13 @@ postfilters = [
     Condition(field="location", op=Operator.CONTAINS, value="Remote"),
 ]
 
-last_job_cursor = pull_jobs(
+cursor_jobs = pull_jobs(
     origin=origin,
     target=target,
-    cursor_mode=CursorMode.UPDATED_AT,
+    cursor=cursor,
     where=where_jobs,          # prefilters (optional)
     having=postfilters,   # postfilters applied in-memory on native objects
-    format_fn=a_to_b.format_job,
+    formatter=a_to_b.format_job,
 )
 ```
 

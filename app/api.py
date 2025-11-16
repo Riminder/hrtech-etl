@@ -84,8 +84,8 @@ def run_job_pull(cfg: JobPullConfig):
     """
     Run a job pull based on a JSON config built in the UI.
     """
-    result = run_job_pull_from_config(cfg)
-    return {"status": "ok", "cursor_end": result}
+    cursor = run_job_pull_from_config(cfg)
+    return {"status": "ok", "cursor": cursor}
 
 
 # ---------- FORMATTER BUILDING (MAPPING-BASED) ----------

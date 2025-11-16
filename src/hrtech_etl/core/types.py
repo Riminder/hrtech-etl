@@ -1,11 +1,8 @@
 # hrtech_etl/core/types.py
 from enum import Enum
-from typing import Any, Callable
+from typing import Any,Optional
 from enum import Enum
 from pydantic import BaseModel
-
-
-FilterFn = Callable[[Any], bool]
 
 
 class WarehouseType(str, Enum):
@@ -16,9 +13,15 @@ class WarehouseType(str, Enum):
 
 
 class CursorMode(str, Enum):
-    UPDATED_AT = "updated_at"
-    CREATED_AT = "created_at"
     ID = "id"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+
+
+class Cursor(BaseModel):
+    mode: CursorMode
+    start: Optional[str] = None  # input
+    end: Optional[str] = None    # output (filled by pipeline)
 
 
 class Operator(str, Enum):

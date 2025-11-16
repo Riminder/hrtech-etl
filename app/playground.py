@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from hrtech_etl.core.connector import BaseConnector
 from hrtech_etl.core.registry import list_connectors, get_connector_instance
 from hrtech_etl.core.ui_schema import export_model_fields
-from hrtech_etl.core.types import Condition, Operator, CursorMode
+from hrtech_etl.core.types import Condition, Operator, Cursor, CursorMode
 from hrtech_etl.core.expressions import Prefilter
 from hrtech_etl.core.pipeline import pull_jobs, pull_profiles
 from hrtech_etl.formatters.base import build_mapping_formatter
@@ -145,6 +145,11 @@ async def playground(request: Request):
     cursor_mode = CursorMode(form.get("cursor_mode") or CursorMode.UPDATED_AT)
     cursor_start = form.get("cursor_start") or None
     cursor_end = None
+    
+    cursor = Cursor(
+        mode=CursorMode(cursor_mode),
+        start=cursor_start,
+    )
 
     try:
         origin_connector: BaseConnector = get_connector_instance(origin_name)
@@ -176,11 +181,10 @@ async def playground(request: Request):
             post_conditions = _parse_postfilter_conditions(form)
 
             if resource == "job":
-                last_cursor = pull_jobs(
+                cursor = pull_jobs(
                     origin=origin_connector,
                     target=target_connector,
-                    cursor_mode=cursor_mode,
-                    cursor_start=cursor_start,
+                    cursor=cursor,
                     where=pre_conditions or None,
                     having=post_conditions or None,
                     formatter=formatter or None,
@@ -188,11 +192,10 @@ async def playground(request: Request):
                     dry_run=False,
                 )
             else:
-                last_cursor = pull_profiles(
+                cursor = pull_profiles(
                     origin=origin_connector,
                     target=target_connector,
-                    cursor_mode=cursor_mode,
-                    cursor_start=cursor_start,
+                    cursor=cursor,
                     where=pre_conditions or None,
                     having=post_conditions or None,
                     formatter=formatter or None,
@@ -204,16 +207,16 @@ async def playground(request: Request):
         except Exception as e:  # noqa: BLE001
             error_message = f"Error: {type(e).__name__}: {e}"
 
-    cursor_end = str(last_cursor) if last_cursor is not None else None
+    cursor_end = cursor.end
 
     context = _build_context(
         request=request,
         origin_name=origin_name,
         target_name=target_name,
         resource=resource,
-        cursor_mode=cursor_mode,
-        cursor_start=cursor_start,
-        cursor_end=cursor_end,
+        cursor_mode=cursor.mode.value if cursor else None,
+        cursor_start=cursor.start if cursor else None,
+        cursor_end=cursor.end if cursor else None,
         origin_fields=origin_fields,
         target_fields=target_fields,
         origin_prefilter_fields=origin_prefilter_fields,

@@ -10,11 +10,13 @@ POut = TypeVar("POut")
 
 
 class JobFormatter(Protocol[JIn, JOut]):
-    def __call__(self, job: JIn) -> JOut: ...
+    def __call__(self, job: JIn) -> JOut:
+        return NotImplemented
 
 
 class ProfileFormatter(Protocol[PIn, POut]):
-    def __call__(self, profile: PIn) -> POut: ...
+    def __call__(self, profile: PIn) -> POut:
+        return NotImplemented
 
 
 MappingSpec = Dict[str, str]  # {"from": "job_title", "to": "title"}
