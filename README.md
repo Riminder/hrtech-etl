@@ -173,7 +173,6 @@ cursor_jobs = pull_jobs(
     origin=origin,
     target=target,
     cursor=cursor,
-    cursor_start=None,
     where=prefilters,  # prefilters → translated into origin query
     formatter=a_to_b.format_job,
 )
