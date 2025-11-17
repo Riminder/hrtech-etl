@@ -5,25 +5,21 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from pydantic import BaseModel
 
-from hrtech_etl.core.auth import BaseAuth, ApiKeyAuth
+from hrtech_etl.core.auth import ApiKeyAuth, BaseAuth
 from hrtech_etl.core.connector import BaseConnector
 from hrtech_etl.core.models import (
     UnifiedJob,
-    UnifiedProfile,
     UnifiedJobEvent,
+    UnifiedProfile,
     UnifiedProfileEvent,
 )
-from hrtech_etl.core.types import (
-    WarehouseType,
-    CursorMode,
-    Condition,
-)
-from hrtech_etl.core.registry import register_connector, ConnectorMeta
+from hrtech_etl.core.registry import ConnectorMeta, register_connector
+from hrtech_etl.core.types import Condition, CursorMode, WarehouseType
 
 from .models import (
     WarehouseAJob,
-    WarehouseAProfile,
     WarehouseAJobEvent,
+    WarehouseAProfile,
     WarehouseAProfileEvent,
 )
 from .requests import WarehouseARequests
@@ -210,6 +206,7 @@ class WarehouseAConnector(BaseConnector):
 
 # ---------- Factory + Registry registration ----------
 
+
 # Optional: factory to build a default instance with some dummy auth
 def _build_default_connector() -> WarehouseAConnector:
     auth = ApiKeyAuth("X-API-Key", "dummy")
@@ -221,7 +218,6 @@ def _build_default_connector() -> WarehouseAConnector:
     return WarehouseAConnector(auth=auth, requests=requests)
 
 
-
 # Register for UI / config usage
 register_connector(
     ConnectorMeta(
@@ -231,7 +227,7 @@ register_connector(
         job_model="hrtech_etl.connectors.warehouse_a.models.WarehouseAJob",
         profile_model="hrtech_etl.connectors.warehouse_a.models.WarehouseAProfile",
     ),
-    factory=_build_default_connector,   # 👈 important
+    factory=_build_default_connector,  # 👈 important
 )
 
 

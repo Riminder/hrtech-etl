@@ -1,12 +1,15 @@
 # core/expressions.py
 from typing import Any, Iterable, Optional, Sequence, Type
+
 from pydantic import BaseModel
 
 from .types import Condition, Operator
 
 
 class ConditionBuilder:
-    def __init__(self, field_name: str, allowed_ops: Optional[Iterable[Operator]] = None):
+    def __init__(
+        self, field_name: str, allowed_ops: Optional[Iterable[Operator]] = None
+    ):
         self.field_name = field_name
         self.allowed_ops = set(allowed_ops) if allowed_ops is not None else None
 

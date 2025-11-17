@@ -1,25 +1,19 @@
 # hrtech_etl/core/pipeline.py
-from typing import Any, Callable, List, Optional, Iterable
+from importlib import import_module
+from typing import Any, Callable, Iterable, List, Optional
+
 from pydantic import BaseModel, Field
 
-from .connector import BaseConnector
-from .registry import get_connector_instance
-from .types import (
-    Resource,
-    Formatter,
-    Cursor,
-    Condition,
-    PushMode,
-    PushResult,
-)
-from .models import UnifiedJobEvent, UnifiedProfileEvent
-from .utils import safe_format_resources, apply_postfilters
 from hrtech_etl.formatters.base import JobFormatter, ProfileFormatter
 
-from importlib import import_module
-
+from .connector import BaseConnector
+from .models import UnifiedJobEvent, UnifiedProfileEvent
+from .registry import get_connector_instance
+from .types import Condition, Cursor, Formatter, PushMode, PushResult, Resource
+from .utils import apply_postfilters, safe_format_resources
 
 # -------- PULL RESOURCES: JOBS or PROFILES --------
+
 
 def pull(
     resource: Resource,
@@ -27,7 +21,7 @@ def pull(
     target: BaseConnector,
     cursor: Cursor,
     where: list[Condition] | None = None,  # prefilters (Prefilter)
-    having: list[Condition] | None = None, #  postfilters on native
+    having: list[Condition] | None = None,  #  postfilters on native
     formatter: Formatter = None,
     batch_size: int = 1000,
     dry_run: bool = False,
@@ -43,7 +37,7 @@ def pull(
         raise ValueError(f"pull() resource must be 'job' or 'profile', got: {resource}")
 
     current = cursor.start
-    last_cursor : str | None = None
+    last_cursor: str | None = None
 
     while True:
         # 1) Read native resources from origin (with prefilters translated to query)
@@ -56,7 +50,7 @@ def pull(
         )
         if not native_resources:
             break
-        
+
         # 2) Apply postfilters IN MEMORY on native objects
         native_resources = apply_postfilters(native_resources, having)
         if not native_resources:
@@ -67,9 +61,13 @@ def pull(
             continue
 
         # 3) Compute last_cursor from the *last* native resource in this batch
-        last_cursor = origin.get_cursor_from_native_resource(resource, native_resources[-1], cursor.mode)
+        last_cursor = origin.get_cursor_from_native_resource(
+            resource, native_resources[-1], cursor.mode
+        )
 
-        formatted_resources = safe_format_resources(resource, origin, target, formatter, native_resources)
+        formatted_resources = safe_format_resources(
+            resource, origin, target, formatter, native_resources
+        )
 
         if not dry_run:
             target.write_resources_batch(resource, formatted_resources)
@@ -81,6 +79,7 @@ def pull(
 
 
 # -------- PUSH RESOURCES: JOBS or PROFILES --------
+
 
 def push(
     resource: Resource,
@@ -97,7 +96,7 @@ def push(
 ) -> PushResult:
     """
     Push resources from origin → target.
-    
+
     Two modes:
     - EVENTS: use `events` + origin.fetch_resources_by_events(...) to get native resources.
     - RESOURCES: use `resources` directly as native origin resources.
@@ -130,7 +129,9 @@ def push(
             batch_events = events[i : i + batch_size]
 
             try:
-                native_resources = origin.fetch_resources_by_events(resource, batch_events)
+                native_resources = origin.fetch_resources_by_events(
+                    resource, batch_events
+                )
             except Exception as exc:
                 errors.append(str(exc))
                 continue
@@ -138,12 +139,16 @@ def push(
             total_fetched += len(native_resources)
 
             # Map resources by id using connector's get_resource_id()
-            resources_by_id = {origin.get_resource_id(resource, r): r for r in native_resources}
+            resources_by_id = {
+                origin.get_resource_id(resource, r): r for r in native_resources
+            }
 
             batch_to_push: list[BaseModel] = []
 
             for event in batch_events:
-                resource_id = event.job_id if resource == Resource.JOB else event.profile_id
+                resource_id = (
+                    event.job_id if resource == Resource.JOB else event.profile_id
+                )
                 resource_by_event = resources_by_id.get(resource_id)
 
                 if resource_by_event is None:
@@ -165,7 +170,9 @@ def push(
             if not batch_to_push:
                 continue
 
-            formatted_resources = safe_format_resources(resource, origin, target, formatter, batch_to_push)
+            formatted_resources = safe_format_resources(
+                resource, origin, target, formatter, batch_to_push
+            )
             if not dry_run:
                 target.write_resources_batch(resource, formatted_resources)
 
@@ -179,7 +186,7 @@ def push(
 
         for i in range(0, total_fetched, batch_size):
             batch_resources = resources[i : i + batch_size]
-            if  batch_resources:
+            if batch_resources:
                 # HAVING: postfilters on native origin resources
                 filtered_resources = apply_postfilters(batch_resources, having)
                 skipped_having += len(batch_resources) - len(filtered_resources)
@@ -194,7 +201,7 @@ def push(
 
     else:
         raise ValueError(f"Unknown PushMode: {mode}")
-    
+
     return PushResult(
         total_events=total_events,
         total_resources_fetched=total_fetched,
@@ -206,6 +213,7 @@ def push(
 
 
 # -------- CONFIG-DRIVEN JOB PULL --------
+
 
 def _load_callable(path: str) -> Callable[..., Any]:
     module_name, _, attr = path.rpartition(".")
@@ -244,6 +252,7 @@ def run_resource_pull_from_config(cfg: ResourcePullConfig) -> Any:
         dry_run=cfg.dry_run,
     )
 
+
 class ResourcePushConfig(BaseModel):
     resource: str
     origin: str
@@ -255,6 +264,7 @@ class ResourcePushConfig(BaseModel):
     formatter: Optional[str] = None
     batch_size: int = 1000
     dry_run: bool = False
+
 
 def run_resource_push_from_config(cfg: ResourcePushConfig) -> PushResult:
     resource: Resource = Resource(cfg.resource)

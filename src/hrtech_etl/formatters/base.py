@@ -1,8 +1,7 @@
 # src/hrtech_etl/formatters/base.py
-from typing import Any, Dict, List, Protocol, TypeVar, Callable, Sequence, Optional
+from typing import Any, Callable, Dict, List, Optional, Protocol, Sequence, TypeVar
 
 from pydantic import BaseModel
-
 
 JIn = TypeVar("JIn", bound=BaseModel)
 JOut = TypeVar("JOut")
@@ -49,7 +48,7 @@ def build_mapping_formatter(
     """
     if not mapping:
         return None
-    
+
     # normalize once
     normalized: List[MappingSpec] = [
         {"from": m["from"], "to": m["to"]} for m in mapping

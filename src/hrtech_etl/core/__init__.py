@@ -1,6 +1,6 @@
 # from .pipeline import pull_jobs, pull_profiles
+from .auth import ApiKeyAuth, BaseAuth, BearerAuth, TokenAuth
 from .models import UnifiedJob, UnifiedProfile
-from .auth import BaseAuth, ApiKeyAuth, TokenAuth, BearerAuth
 from .types import WarehouseType
 
 __all__ = [
