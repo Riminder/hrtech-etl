@@ -1,13 +1,17 @@
 # hrtech_etl/core/types.py
 from enum import Enum
-from typing import Any,Optional, Callable, Dict, Union
+from typing import Any, Callable, Dict, Optional, Union
+
 from pydantic import BaseModel
+
 
 class Resource(str, Enum):
     JOB = "job"
     PROFILE = "profile"
 
+
 Formatter = Optional[Callable[[BaseModel], Union[BaseModel, Dict[str, Any]]]]
+
 
 class WarehouseType(str, Enum):
     ATS = "ats"
@@ -26,7 +30,7 @@ class CursorMode(str, Enum):
 class Cursor(BaseModel):
     mode: CursorMode
     start: Optional[str] = None  # input
-    end: Optional[str] = None    # output (filled by pipeline)
+    end: Optional[str] = None  # output (filled by pipeline)
 
 
 class Operator(str, Enum):
@@ -50,7 +54,7 @@ class JobEventType(str, Enum):
     UPDATED = "updated"
     DELETED = "deleted"
     ARCHIVED = "archived"
-    UPSERTED = "upserted" # created or updated
+    UPSERTED = "upserted"  # created or updated
 
 
 class ProfileEventType(str, Enum):
@@ -58,12 +62,12 @@ class ProfileEventType(str, Enum):
     UPDATED = "updated"
     DELETED = "deleted"
     ARCHIVED = "archived"
-    UPSERTED = "upserted" # created or updated
+    UPSERTED = "upserted"  # created or updated
 
 
 class PushMode(str, Enum):
-    EVENTS = "events" # push job/profile events
-    RESOURCES = "resources" # e.g., jobs, profiles #todo change to items
+    EVENTS = "events"  # push job/profile events
+    RESOURCES = "resources"  # e.g., jobs, profiles #todo change to items
 
 
 class PushResult(BaseModel):

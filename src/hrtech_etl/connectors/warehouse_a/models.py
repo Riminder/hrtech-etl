@@ -6,11 +6,8 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
-from hrtech_etl.core.models import (
-    UnifiedJobEvent,
-    UnifiedProfileEvent,
-)
-from hrtech_etl.core.types import JobEventType, ProfileEventType, Cursor, CursorMode
+from hrtech_etl.core.models import UnifiedJobEvent, UnifiedProfileEvent
+from hrtech_etl.core.types import Cursor, CursorMode, JobEventType, ProfileEventType
 
 
 class WarehouseAJob(BaseModel):
@@ -174,7 +171,9 @@ class WarehouseAProfileEvent(BaseModel):
     payload: Dict[str, Any]
 
     @classmethod
-    def from_payload(cls, payload: Dict[str, Any]) -> Optional["WarehouseAProfileEvent"]:
+    def from_payload(
+        cls, payload: Dict[str, Any]
+    ) -> Optional["WarehouseAProfileEvent"]:
         # Adjust to actual payload shape
         try:
             event_id = payload["id"]
@@ -218,4 +217,6 @@ class WarehouseAProfileEvent(BaseModel):
             metadata={},
             cursor=cursor,
         )
+
+
 # ----------------------------------------------

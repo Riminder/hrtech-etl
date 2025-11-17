@@ -1,12 +1,12 @@
 # hrtech_etl/core/connector.py
 from abc import ABC, abstractmethod
-from typing import Any, List, Tuple, Optional, Type, Iterable
+from typing import Any, Iterable, List, Optional, Tuple, Type
 
 from pydantic import BaseModel
 
 from .auth import BaseAuth
-from .models import UnifiedJob, UnifiedProfile, UnifiedJobEvent, UnifiedProfileEvent
-from .types import Resource, WarehouseType, CursorMode, Condition
+from .models import UnifiedJob, UnifiedJobEvent, UnifiedProfile, UnifiedProfileEvent
+from .types import Condition, CursorMode, Resource, WarehouseType
 
 
 class BaseConnector(ABC):
@@ -21,12 +21,18 @@ class BaseConnector(ABC):
 
     # --- AUTH / INIT ---
 
-    def __init__(self, auth: BaseAuth, name: str, warehouse_type: WarehouseType, requests: BaseModel):
+    def __init__(
+        self,
+        auth: BaseAuth,
+        name: str,
+        warehouse_type: WarehouseType,
+        requests: BaseModel,
+    ):
         self.auth = auth
         self.name = name
         self.warehouse_type = warehouse_type
         self.requests = requests
-    
+
     # --- JOBS PRIMITIVES: READ / WRITE / CURSOR ---
 
     @abstractmethod
@@ -43,7 +49,7 @@ class BaseConnector(ABC):
     def read_jobs_batch(
         self,
         where: list[Condition] | None,
-        cursor_start: str = None, #fixme starting cursor 
+        cursor_start: str = None,  # fixme starting cursor
         cursor_mode: CursorMode = CursorMode.UPDATED_AT,
         batch_size: int = 1000,
     ) -> Tuple[List[BaseModel], Optional[str]]:
@@ -59,7 +65,7 @@ class BaseConnector(ABC):
         Write/upsert a batch of native jobs into this warehouse.
         """
         raise NotImplementedError
-    
+
     # not abstractmethod
     def write_jobs_batch(self, jobs: List[Any]) -> None:
         if not jobs:
@@ -77,7 +83,7 @@ class BaseConnector(ABC):
                 f"[{self.name}] Unsupported job type {type(first)} "
                 f"(expected {self.job_native_cls} or UnifiedJob)."
             )
-    
+
     @abstractmethod
     def get_cursor_from_native_job(
         self, native_job: BaseModel, cursor_mode: CursorMode
@@ -89,7 +95,6 @@ class BaseConnector(ABC):
     def get_job_id(self, native_job: BaseModel) -> str:
         """Extract business job_id from a native job."""
         raise NotImplementedError
-
 
     # --- PROFILES: READ / WRITE / CURSOR ---
 
@@ -123,7 +128,7 @@ class BaseConnector(ABC):
         Write/upsert a batch of native profiles into this warehouse.
         """
         raise NotImplementedError
-    
+
     # not abstractmethod
     def write_profiles_batch(self, profiles: List[Any]) -> None:
         if not profiles:
@@ -141,7 +146,7 @@ class BaseConnector(ABC):
                 f"[{self.name}] Unsupported profile type {type(first)} "
                 f"(expected {self.profile_native_cls} or UnifiedProfile)."
             )
-    
+
     @abstractmethod
     def get_cursor_from_native_profile(
         self, native_profile: BaseModel, cursor_mode: CursorMode
@@ -151,7 +156,6 @@ class BaseConnector(ABC):
     @abstractmethod
     def get_profile_id(self, native_profile: BaseModel) -> str:
         raise NotImplementedError
-    
 
     # --- EVENTS: JOBS ---
 
@@ -166,7 +170,9 @@ class BaseConnector(ABC):
             f"{self.__class__.__name__} does not implement parse_job_event"
         )
 
-    def fetch_jobs_by_events(self, events: Iterable[UnifiedJobEvent]) -> List[BaseModel]:
+    def fetch_jobs_by_events(
+        self, events: Iterable[UnifiedJobEvent]
+    ) -> List[BaseModel]:
         """
         Given unified JobEvent objects (with job_id), fetch native jobs.
         Override per connector depending on how you query jobs by id(s).
@@ -187,8 +193,10 @@ class BaseConnector(ABC):
         raise NotImplementedError(
             f"{self.__class__.__name__} does not implement parse_profile_event"
         )
-    
-    def fetch_profiles_by_events(self, events: Iterable[UnifiedProfileEvent]) -> List[BaseModel]:
+
+    def fetch_profiles_by_events(
+        self, events: Iterable[UnifiedProfileEvent]
+    ) -> List[BaseModel]:
         """
         Given unified ProfileEvent objects (with profile_id), fetch native profiles.
         Override per connector depending on how you query profiles by id(s).
@@ -196,7 +204,6 @@ class BaseConnector(ABC):
         raise NotImplementedError(
             f"{self.__class__.__name__} does not implement fetch_profiles_by_events"
         )
-
 
     # -------- GENERIC RESOURCE HELPERS (used by core) --------
     # Resources: JOB / PROFILE
@@ -279,7 +286,9 @@ class BaseConnector(ABC):
         elif resource == Resource.PROFILE:
             return self.parse_profile_event(payload)
         else:
-            raise ValueError(f"Unsupported resource in parse_resource_event: {resource}")
+            raise ValueError(
+                f"Unsupported resource in parse_resource_event: {resource}"
+            )
 
     def fetch_resources_by_events(
         self,
@@ -289,13 +298,13 @@ class BaseConnector(ABC):
         """
         Fetch native resources by unified events depending on resource type.
         - Resource.JOB: fetch_jobs_by_events
-        - Resource.PROFILE: fetch_profiles_by_events  
+        - Resource.PROFILE: fetch_profiles_by_events
         """
         if resource == Resource.JOB:
             return self.fetch_jobs_by_events(events)  # type: ignore
         elif resource == Resource.PROFILE:
             return self.fetch_profiles_by_events(events)  # type: ignore
         else:
-            raise ValueError(f"Unsupported resource in fetch_resources_by_events: {resource}")
-
-   
+            raise ValueError(
+                f"Unsupported resource in fetch_resources_by_events: {resource}"
+            )

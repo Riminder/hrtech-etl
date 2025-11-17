@@ -7,8 +7,8 @@ class RequestClient(Protocol):
     Protocol for clients that provide a 'request' method.
     This ensures type checking for the client passed to BaseRequests.
     """
-    def request(self, *args: Any, **kwargs: Any) -> Any:
-        ...
+
+    def request(self, *args: Any, **kwargs: Any) -> Any: ...
 
 
 class BaseRequests:
@@ -58,5 +58,3 @@ class BaseRequests:
         """
         self._request_count += 1
         return self._client.request(*args, **kwargs)
-
-

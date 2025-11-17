@@ -3,7 +3,8 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
-from .types import JobEventType, ProfileEventType, Cursor, CursorMode
+
+from .types import Cursor, CursorMode, JobEventType, ProfileEventType
 
 
 class UnifiedJob(BaseModel):
@@ -23,9 +24,7 @@ class UnifiedJobEvent(BaseModel):
     occurred_at: Optional[datetime] = None
     payload: Dict[str, Any] = {}
     metadata: Dict[str, Any] = {}
-    cursor: Cursor = Field(
-        default_factory=lambda: Cursor(mode=CursorMode.ID)
-    )
+    cursor: Cursor = Field(default_factory=lambda: Cursor(mode=CursorMode.ID))
 
 
 class UnifiedProfile(BaseModel):
@@ -46,6 +45,4 @@ class UnifiedProfileEvent(BaseModel):
     occurred_at: Optional[datetime] = None
     payload: Dict[str, Any] = {}
     metadata: Dict[str, Any] = {}
-    cursor: Cursor = Field(
-        default_factory=lambda: Cursor(mode=CursorMode.ID)
-    )
+    cursor: Cursor = Field(default_factory=lambda: Cursor(mode=CursorMode.ID))

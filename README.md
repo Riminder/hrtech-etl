@@ -679,6 +679,8 @@ hrtech-etl/
 
 Planned / in-progress:
 
+* [ ] DevOps v1: local integration environment (Poetry)
+* [ ] DevOps v2: GitHub workflow + package release bumping through PSR
 * [ ] Add real-world ATS/CRM/Jobboard/HCM connectors
 * [ ] Improve type coercion for filters (dates, ints, enums)
 * [ ] Persist formatters and configs (instead of in-memory `FORMATTER_REGISTRY`)

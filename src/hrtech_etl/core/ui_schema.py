@@ -1,5 +1,6 @@
 # hrtech_etl/core/ui_schema.py
 from typing import Any, Dict, List, Type
+
 from pydantic import BaseModel
 
 

@@ -184,7 +184,7 @@ def get_formatter_route(formatter_id: str):
         mapping=mapping,
     )
 
- ---------- RUN PULL / PUSH WITH formatter_id ----------
+# ---------- RUN PULL / PUSH WITH formatter_id ----------
 
 class RunPullWithFormatterRequest(BaseModel):
     formatter_id: str

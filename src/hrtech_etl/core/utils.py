@@ -1,21 +1,11 @@
 # hrtech_etl/core/utils.py
 from functools import wraps
-from typing import Any
+from typing import Any, Dict, Iterable, List
 
 from pydantic import BaseModel
 
-from .types import Resource, Formatter, CursorMode, Condition, Operator
-
-from typing import Any, Iterable, List
-
 from .connector import BaseConnector
-
-
-from typing import List, Dict, Any
-from pydantic import BaseModel
-
-from .types import Resource, Formatter
-from .connector import BaseConnector
+from .types import Condition, CursorMode, Formatter, Operator, Resource
 
 
 def safe_format_resources(
@@ -52,7 +42,9 @@ def safe_format_resources(
         elif resource == Resource.PROFILE:
             target_cls = target.profile_native_cls
         else:
-            raise ValueError(f"Unsupported resource in safe_format_resources: {resource}")
+            raise ValueError(
+                f"Unsupported resource in safe_format_resources: {resource}"
+            )
 
         for r in native_resources:
             out = formatter(r)
@@ -101,7 +93,7 @@ def _match_condition(value: Any, cond: Condition) -> bool:
         return value in (target or [])
     if op == Operator.CONTAINS:
         return value is not None and str(target) in str(value)
-    #TODO extend with more ops (startswith, endswith, regex, etc.)
+    # TODO extend with more ops (startswith, endswith, regex, etc.)
     return True
 
 
@@ -133,6 +125,7 @@ def single_request(fn):
     Ensure that an action executes exactly ONE underlying request
     via BaseRequests._request().
     """
+
     @wraps(fn)
     def wrapper(self, *args, **kwargs):
         # reset counter before running
