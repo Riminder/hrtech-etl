@@ -1,6 +1,3 @@
-Here’s `CONTRIBUTION.md` with a Table of Contents added at the top:
-
-````markdown
 # Contributing to hrtech-etl
 
 First of all, thank you for your interest in contributing to **hrtech-etl** 💙  
@@ -396,5 +393,4 @@ We’ll discuss and converge on a design before you invest too much coding time.
 
 Thanks again for contributing to **hrtech-etl** 🙌
 
-```
 ```
