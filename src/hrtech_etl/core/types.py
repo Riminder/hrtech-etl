@@ -2,7 +2,13 @@
 from enum import Enum
 from typing import Any,Optional
 from pydantic import BaseModel
+from hrtech_etl.formatters.base import JobFormatter, ProfileFormatter
 
+class Resource(str, Enum):
+    JOB = "job"
+    PROFILE = "profile"
+
+Formatter = JobFormatter | ProfileFormatter | None
 
 class WarehouseType(str, Enum):
     ATS = "ats"

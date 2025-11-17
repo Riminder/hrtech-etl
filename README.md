@@ -474,10 +474,12 @@ hrtech-etl/
 > This is a **WIP** (work in progress).
 
 Planned / in-progress:
-## TODO
-* [ ] Add push_jobs pipeline logic to api
+- [ ] mirror this generic pattern in your FastAPI API + playground routes (so everything calls only pull / push with resource), or
+- [ ] write a tiny tests/test_pipeline.py that mocks a connector and validates pull/push behaviour for both job and profile.
+
+Backlog
+* [ ] Add push jobs and profiles pipeline to cls
 * [ ] Add push_jobs pipeline ui to playground
-* [ ] Add pull_profiles logic to api
 * [ ] Add pull_profiles logic to playground
 * [ ] Add push_profiles logic to api
 * [ ] Add push_profiles logic to playground

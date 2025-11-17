@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .types import CursorMode, Condition, Operator
+from .types import Resource, Formatter, CursorMode, Condition, Operator
 
 from typing import Any, Iterable, List
 
@@ -12,34 +12,35 @@ from .connector import BaseConnector
 from hrtech_etl.formatters.base import JobFormatter, ProfileFormatter
 
 
-def safe_format_jobs(
+def safe_format_resources(
+    resource: Resource,
     origin: BaseConnector,
     target: BaseConnector,
-    formatter: JobFormatter | None,
-    native_jobs: List[BaseModel],
+    formatter: Formatter,
+    native_resources: List[BaseModel],
 ) -> List[BaseModel]:
     """
-    Use explicit formatter if provided, otherwise:
-    origin-native → UnifiedJob → target-native.
+    Generic formatter:
+
+    - If `formatter` is provided: apply it directly on each native resource.
+    - Else: use unified path:
+        origin-native -> UnifiedJob/UnifiedProfile -> target-native
     """
+    if not native_resources:
+        return []
+
     if formatter is not None:
-        return [formatter(job) for job in native_jobs]
+        return [formatter(r) for r in native_resources]
 
-    unified_jobs = [origin.to_unified_job(job) for job in native_jobs]
-    return [target.from_unified_job(uj) for uj in unified_jobs]
+    if resource == Resource.JOB:
+        unified_list = [origin.to_unified_job(r) for r in native_resources]
+        return [target.from_unified_job(u) for u in unified_list]
 
+    if resource == Resource.PROFILE:
+        unified_list = [origin.to_unified_profile(r) for r in native_resources]
+        return [target.from_unified_profile(u) for u in unified_list]
 
-def safe_format_profiles(
-    origin: BaseConnector,
-    target: BaseConnector,
-    formatter: ProfileFormatter | None,
-    native_profiles: List[BaseModel],
-) -> List[BaseModel]:
-    if formatter is not None:
-        return [formatter(p) for p in native_profiles]
-
-    unified_profiles = [origin.to_unified_profile(p) for p in native_profiles]
-    return [target.from_unified_profile(up) for up in unified_profiles]
+    raise ValueError(f"Unsupported resource in safe_format_resources: {resource}")
 
 
 def _match_condition(value: Any, cond: Condition) -> bool:

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from .auth import BaseAuth
 from .models import UnifiedJob, UnifiedProfile, UnifiedJobEvent, UnifiedProfileEvent
-from .types import WarehouseType, Cursor, CursorMode, Condition
+from .types import Resource, WarehouseType, CursorMode, Condition
 
 
 class BaseConnector(ABC):
@@ -27,7 +27,7 @@ class BaseConnector(ABC):
         self.warehouse_type = warehouse_type
         self.requests = requests
     
-    # --- JOBS: READ / WRITE / CURSOR ---
+    # --- JOBS PRIMITIVES: READ / WRITE / CURSOR ---
 
     @abstractmethod
     def to_unified_job(self, native: BaseModel) -> UnifiedJob:
@@ -46,7 +46,7 @@ class BaseConnector(ABC):
         cursor_start: str = None, #fixme starting cursor 
         cursor_mode: CursorMode = CursorMode.UPDATED_AT,
         batch_size: int = 1000,
-    ) -> Tuple[List[BaseModel], Cursor]:
+    ) -> Tuple[List[BaseModel], Optional[str]]:
         """
         Read a batch of native jobs with optional pre-filter (WHERE) and cursor.
         Returns (jobs, next_cursor).
@@ -60,7 +60,7 @@ class BaseConnector(ABC):
         """
         raise NotImplementedError
     
-    @abstractmethod
+    # not abstractmethod
     def write_jobs_batch(self, jobs: List[Any]) -> None:
         if not jobs:
             return
@@ -110,7 +110,7 @@ class BaseConnector(ABC):
         cursor_start: str = None,
         cursor_mode: CursorMode = CursorMode.UPDATED_AT,
         batch_size: int = 1000,
-    ) -> Tuple[List[BaseModel], Cursor]:
+    ) -> Tuple[List[BaseModel], Optional[str]]:
         """
         Read a batch of native profiles with optional pre-filter (WHERE) and cursor.
         Returns (profiles, next_cursor).
@@ -124,7 +124,7 @@ class BaseConnector(ABC):
         """
         raise NotImplementedError
     
-    @abstractmethod
+    # not abstractmethod
     def write_profiles_batch(self, profiles: List[Any]) -> None:
         if not profiles:
             return
@@ -172,7 +172,7 @@ class BaseConnector(ABC):
         Override per connector depending on how you query jobs by id(s).
         """
         raise NotImplementedError(
-            f"{self.__class__.__name__} does not implement fetch_jobs_for_events"
+            f"{self.__class__.__name__} does not implement fetch_jobs_by_events"
         )
 
     # --- EVENTS: PROFILES ---
@@ -194,6 +194,103 @@ class BaseConnector(ABC):
         Override per connector depending on how you query profiles by id(s).
         """
         raise NotImplementedError(
-            f"{self.__class__.__name__} does not implement fetch_profiles_for_events"
+            f"{self.__class__.__name__} does not implement fetch_profiles_by_events"
         )
 
+
+    # -------- GENERIC RESOURCE HELPERS (used by core) --------
+    # Resources: JOB / PROFILE
+    def read_resources_batch(
+        self,
+        resource: Resource,
+        where: list[Condition] | None,
+        cursor_start: Optional[str],
+        cursor_mode: CursorMode,
+        batch_size: int,
+    ) -> Tuple[List[BaseModel], Optional[str]]:
+        if resource == Resource.JOB:
+            return self.read_jobs_batch(
+                where=where,
+                cursor_start=cursor_start,
+                cursor_mode=cursor_mode,
+                batch_size=batch_size,
+            )
+        elif resource == Resource.PROFILE:
+            return self.read_profiles_batch(
+                where=where,
+                cursor_start=cursor_start,
+                cursor_mode=cursor_mode,
+                batch_size=batch_size,
+            )
+        else:
+            raise ValueError(f"Unsupported resource: {resource}")
+
+    def write_resources_batch(
+        self,
+        resource: Resource,
+        resources: List[Any],
+    ) -> None:
+        if resource == Resource.JOB:
+            self.write_jobs_batch(resources)
+        elif resource == Resource.PROFILE:
+            self.write_profiles_batch(resources)
+        else:
+            raise ValueError(f"Unsupported resource: {resource}")
+
+    def get_cursor_from_native_resource(
+        self,
+        resource: Resource,
+        native_resource: BaseModel,
+        cursor_mode: CursorMode,
+    ) -> Optional[str]:
+        if resource == Resource.JOB:
+            return self.get_cursor_from_native_job(native_resource, cursor_mode)
+        elif resource == Resource.PROFILE:
+            return self.get_cursor_from_native_profile(native_resource, cursor_mode)
+        else:
+            raise ValueError(f"Unsupported resource: {resource}")
+
+    def get_resource_id(
+        self,
+        resource: Resource,
+        native_resource: BaseModel,
+    ) -> str:
+        if resource == Resource.JOB:
+            return self.get_job_id(native_resource)
+        elif resource == Resource.PROFILE:
+            return self.get_profile_id(native_resource)
+        else:
+            raise ValueError(f"Unsupported resource: {resource}")
+
+    # --- GENERIC EVENT HELPERS ---
+
+    def parse_resource_event(
+        self,
+        resource: Resource,
+        payload: Any,
+    ) -> UnifiedJobEvent | UnifiedProfileEvent | None:
+        """
+        Parse event payload into unified event depending on resource type.
+        - Resource.JOB: parse_job_event
+        - Resource.PROFILE: parse_profile_event
+        """
+        if resource == Resource.JOB:
+            return self.parse_job_event(payload)
+        elif resource == Resource.PROFILE:
+            return self.parse_profile_event(payload)
+        else:
+            raise ValueError(f"Unsupported resource in parse_resource_event: {resource}")
+
+    def fetch_resources_by_events(
+        self,
+        resource: Resource,
+        events: Iterable[UnifiedJobEvent] | Iterable[UnifiedProfileEvent],
+    ) -> List[BaseModel]:
+        if resource == Resource.JOB:
+            return self.fetch_jobs_by_events(events)  # type: ignore
+        elif resource == Resource.PROFILE:
+            return self.fetch_profiles_by_events(events)  # type: ignore
+        else:
+            raise ValueError(f"Unsupported resource in fetch_resources_by_events: {resource}")
+
+   
