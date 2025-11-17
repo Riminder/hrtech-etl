@@ -22,7 +22,7 @@ Opensource ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM
 - Uses **pluggable formatters** (Python or mapping-based)
 - Ships with a **FastAPI backend** that can run in **API**, **Playground**, or **both** modes
 
-👉 See also: [CONTRIBUTION.md](./CONTRIBUTION.md)
+👉 See also: [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ---
 
@@ -626,7 +626,7 @@ If no formatter is passed:
 hrtech-etl/
 ├─ pyproject.toml
 ├─ README.md
-├─ CONTRIBUTION.md
+├─ CONTRIBUTING.md
 │
 ├─ src/
 │  └─ hrtech_etl/
@@ -699,7 +699,7 @@ Contributions are very welcome ❤️
 * To extend the playground
 * To add new filter operators or cursor strategies
 
-See [CONTRIBUTION.md](./CONTRIBUTION.md) for:
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for:
 
 * repo layout
 * dev setup
