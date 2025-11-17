@@ -96,7 +96,7 @@ cursor_jobs = pull_jobs(
     target=target,
     cursor=cursor,
     formatter=a_to_b.format_job,        # standard job formatter
-    limit=5000,
+    batch_size=5000,
 )
 print("cursor_start:", cursor_jobs.start)
 print("cursor_end:", cursor_jobs.end)
@@ -107,7 +107,7 @@ cursor = pull_profiles(
     target=target,
     cursor=cursor,
     formatter=a_to_b.format_profile,
-    limit=5000,
+    batch_size=5000,
 )
 
 # You can store cursor_jobs.end / cursor_profiles.end to resume on next run.
@@ -215,6 +215,33 @@ cursor_jobs = pull_jobs(
 
 ---
 
+### Push pipeline 
+
+```python
+
+from hrtech_etl.core.models import UnifiedJobEvent
+from hrtech_etl.core.pipeline import push_jobs
+
+raw_events = read_raw_events_somewhere()
+
+events: list[UnifiedJobEvent] = []
+for raw in raw_events:
+    ev = origin.parse_job_event(raw)
+    if ev is not None:
+        events.append(ev)
+
+result = push_jobs(
+    origin=origin,
+    target=target,
+    events=events,
+    having=postfilters,
+    formatter=a_to_b.format_job,
+)
+```
+
+---
+
+
 ### Run Pipeline Using JSON / Mapping Formatter
 
 You can also drive the pipeline from **JSON config** and a simple **field mapping** (built from UI):
@@ -236,7 +263,7 @@ def run_job_pull_with_formatter_id(origin, target, formatter_id: str):
         target=target,
         cursor_mode=CursorMode.UPDATED_AT,
         formatter=formatter,
-        limit=5000,
+        batch_size=5000,
     )
 ```
 
@@ -463,6 +490,8 @@ Planned / in-progress:
 * [ ] Add more warehouse templates (ATS / CRM / Jobboard / HCM)
 * [ ] Persist formatters & configs (beyond in-memory registry)
 * [ ] add pydantic gateway : https://pydantic.dev/ai-gateway 
+* [ ] add MCP
+* [ ] add Agent
 * [ ] Add more tests & CI
 
 ---

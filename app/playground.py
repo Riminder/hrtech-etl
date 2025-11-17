@@ -188,7 +188,7 @@ async def playground(request: Request):
                     where=pre_conditions or None,
                     having=post_conditions or None,
                     formatter=formatter or None,
-                    limit=1000,
+                    batch_size=1000,
                     dry_run=False,
                 )
             else:
@@ -199,7 +199,7 @@ async def playground(request: Request):
                     where=pre_conditions or None,
                     having=post_conditions or None,
                     formatter=formatter or None,
-                    limit=1000,
+                    batch_size=1000,
                     dry_run=False,
                 )
 

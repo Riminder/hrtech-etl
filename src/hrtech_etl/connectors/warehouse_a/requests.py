@@ -14,12 +14,12 @@ class WarehouseARequests(BaseRequests):
     def fetch_jobs(
         self,
         cursor: Cursor,
-        limit: int,
+        batch_size: int,
     ) -> Tuple[List[WarehouseAJob], Cursor]:
         resp = self._request(
             "GET",
             "/jobs",
-            params={"cursor": cursor, "limit": limit},
+            params={"cursor": cursor, "batch_size": batch_size},
         )
         ...
         return jobs, next_cursor
@@ -28,12 +28,12 @@ class WarehouseARequests(BaseRequests):
     def fetch_profiles(
         self,
         cursor: Cursor,
-        limit: int,
+        batch_size: int,
     ) -> Tuple[List[WarehouseAProfile], Cursor]:
         resp = self._request(
             "GET",
             "/profiles",
-            params={"cursor": cursor, "limit": limit},
+            params={"cursor": cursor, "batch_size": batch_size},
         )
         ...
         return profiles, next_cursor
@@ -63,7 +63,7 @@ class WarehouseARequests(BaseRequests):
     def fetch_jobs(
         self,
         cursor: Cursor,
-        limit: int,
+        batch_size: int,
         filters: dict | None = None,
     ) -> Tuple[List[WarehouseAJob], Cursor]:
         self._record_request()
@@ -73,7 +73,7 @@ class WarehouseARequests(BaseRequests):
     def fetch_profiles(
         self,
         cursor: Cursor,
-        limit: int,
+        batch_size: int,
         filters: dict | None = None,
     ) -> Tuple[List[WarehouseAProfile], Cursor]:
         self._record_request()
