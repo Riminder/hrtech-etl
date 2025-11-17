@@ -286,6 +286,11 @@ class BaseConnector(ABC):
         resource: Resource,
         events: Iterable[UnifiedJobEvent] | Iterable[UnifiedProfileEvent],
     ) -> List[BaseModel]:
+        """
+        Fetch native resources by unified events depending on resource type.
+        - Resource.JOB: fetch_jobs_by_events
+        - Resource.PROFILE: fetch_profiles_by_events  
+        """
         if resource == Resource.JOB:
             return self.fetch_jobs_by_events(events)  # type: ignore
         elif resource == Resource.PROFILE:

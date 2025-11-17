@@ -1,12 +1,25 @@
 # src/hrtech_etl/formatters/base.py
-from typing import Any, Dict, List, Protocol, TypeVar, Callable, Sequence
+from typing import Any, Dict, List, Protocol, TypeVar, Callable, Sequence, Optional
 
 from pydantic import BaseModel
+
 
 JIn = TypeVar("JIn", bound=BaseModel)
 JOut = TypeVar("JOut")
 PIn = TypeVar("PIn", bound=BaseModel)
 POut = TypeVar("POut")
+
+
+# Global registry used by the API layer to store formatter specs:
+# {
+#   formatter_id: {
+#     "resource": "job" | "profile",
+#     "origin": "warehouse_a",
+#     "target": "warehouse_b",
+#     "mapping": [{"from": "...", "to": "..."}, ...],
+#   },
+# }
+FORMATTER_REGISTRY: Dict[str, Dict] = {}
 
 
 class JobFormatter(Protocol[JIn, JOut]):
@@ -24,7 +37,7 @@ MappingSpec = Dict[str, str]  # {"from": "job_title", "to": "title"}
 
 def build_mapping_formatter(
     mapping: Sequence[MappingSpec],
-) -> Callable[[Any], Dict[str, Any]]:
+) -> Optional[Callable[[Any], Dict[str, Any]]]:
     """
     Build a simple mapping-based formatter.
 

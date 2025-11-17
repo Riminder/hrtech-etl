@@ -9,7 +9,13 @@ from .types import Resource, Formatter, CursorMode, Condition, Operator
 from typing import Any, Iterable, List
 
 from .connector import BaseConnector
-from hrtech_etl.formatters.base import JobFormatter, ProfileFormatter
+
+
+from typing import List, Dict, Any
+from pydantic import BaseModel
+
+from .types import Resource, Formatter
+from .connector import BaseConnector
 
 
 def safe_format_resources(
@@ -22,16 +28,50 @@ def safe_format_resources(
     """
     Generic formatter:
 
-    - If `formatter` is provided: apply it directly on each native resource.
+    - If `formatter` is provided:
+        * apply it on each native resource
+        * accepted outputs:
+            - a Pydantic model (native or unified)
+            - a dict (e.g. from build_mapping_formatter)
+        * dict outputs are wrapped into the target's native model
+          for the given resource type.
+
     - Else: use unified path:
         origin-native -> UnifiedJob/UnifiedProfile -> target-native
     """
     if not native_resources:
         return []
 
+    # -------- CASE 1: explicit formatter provided --------
     if formatter is not None:
-        return [formatter(r) for r in native_resources]
+        out_list: List[BaseModel] = []
 
+        # choose target native class per resource
+        if resource == Resource.JOB:
+            target_cls = target.job_native_cls
+        elif resource == Resource.PROFILE:
+            target_cls = target.profile_native_cls
+        else:
+            raise ValueError(f"Unsupported resource in safe_format_resources: {resource}")
+
+        for r in native_resources:
+            out = formatter(r)
+
+            if isinstance(out, BaseModel):
+                # Already a model: assume it's either native or unified
+                out_list.append(out)
+            elif isinstance(out, dict):
+                # Mapping-based formatter: build target native model from dict
+                out_list.append(target_cls(**out))
+            else:
+                raise TypeError(
+                    f"Formatter returned unsupported type {type(out)}. "
+                    f"Expected BaseModel or dict."
+                )
+
+        return out_list
+
+    # -------- CASE 2: no formatter → unified path --------
     if resource == Resource.JOB:
         unified_list = [origin.to_unified_job(r) for r in native_resources]
         return [target.from_unified_job(u) for u in unified_list]

@@ -1,14 +1,13 @@
 # hrtech_etl/core/types.py
 from enum import Enum
-from typing import Any,Optional
+from typing import Any,Optional, Callable, Dict, Union
 from pydantic import BaseModel
-from hrtech_etl.formatters.base import JobFormatter, ProfileFormatter
 
 class Resource(str, Enum):
     JOB = "job"
     PROFILE = "profile"
 
-Formatter = JobFormatter | ProfileFormatter | None
+Formatter = Optional[Callable[[BaseModel], Union[BaseModel, Dict[str, Any]]]]
 
 class WarehouseType(str, Enum):
     ATS = "ats"

@@ -1,4 +1,3 @@
-<!-- app/templates/playground.html -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -10,23 +9,51 @@
     table { border-collapse: collapse; width: 100%; }
     th, td { border: 1px solid #ccc; padding: 0.25rem 0.5rem; }
     th { background-color: #f5f5f5; }
+    .msg-ok { margin-top:1rem; padding:0.5rem; border:1px solid #0a0; }
+    .msg-err { margin-top:1rem; padding:0.5rem; border:1px solid #a00; color:#a00; }
+    textarea { width: 100%; min-height: 120px; font-family: monospace; }
   </style>
 </head>
 <body>
   <h1>hrtech-etl Playground</h1>
 
+  {% if result_summary %}
+    <div class="msg-ok"><strong>{{ result_summary }}</strong></div>
+  {% endif %}
+
+  {% if error_message %}
+    <div class="msg-err"><strong>{{ error_message }}</strong></div>
+  {% endif %}
+
   <form method="post" action="/playground">
     <input type="hidden" name="action" value="run" />
 
-    <!-- Connectors & Resource -->
     <fieldset>
-      <legend>Connectors & Resource</legend>
+      <legend>Operation / Connectors / Resource</legend>
+
+      <label>Operation:
+        <select name="operation">
+          <option value="pull" {% if operation == "pull" %}selected{% endif %}>Pull</option>
+          <option value="push" {% if operation == "push" %}selected{% endif %}>Push</option>
+        </select>
+      </label>
+
+      &nbsp;&nbsp;
+
+      <label>Push mode:
+        <select name="push_mode">
+          <option value="resources" {% if push_mode == "resources" %}selected{% endif %}>Resources</option>
+          <option value="events" {% if push_mode == "events" %}selected{% endif %}>Events</option>
+        </select>
+      </label>
+
+      <br/><br/>
 
       <label>Origin:
         <select name="origin">
           {% for meta in connectors_meta %}
             <option value="{{ meta.name }}"
-                    {% if meta.name == origin_name %}selected{% endif %}>
+              {% if meta.name == origin_name %}selected{% endif %}>
               {{ meta.label }} ({{ meta.warehouse_type.value }})
             </option>
           {% endfor %}
@@ -39,7 +66,7 @@
         <select name="target">
           {% for meta in connectors_meta %}
             <option value="{{ meta.name }}"
-                    {% if meta.name == target_name %}selected{% endif %}>
+              {% if meta.name == target_name %}selected{% endif %}>
               {{ meta.label }} ({{ meta.warehouse_type.value }})
             </option>
           {% endfor %}
@@ -54,36 +81,32 @@
           <option value="profile" {% if resource == "profile" %}selected{% endif %}>Profile</option>
         </select>
       </label>
-    </fieldset>
 
-    <!-- Cursor -->
-    <fieldset>
-      <legend>Cursor</legend>
+      <br/><br/>
+
       <label>Cursor mode:
         <select name="cursor_mode">
-          <option value="">(default)</option>
-          <option value="id" {% if cursor_mode == "id" %}selected{% endif %}>ID</option>
-          <option value="created_at" {% if cursor_mode == "created_at" %}selected{% endif %}>created_at</option>
           <option value="updated_at" {% if cursor_mode == "updated_at" %}selected{% endif %}>updated_at</option>
+          <option value="created_at" {% if cursor_mode == "created_at" %}selected{% endif %}>created_at</option>
+          <option value="id" {% if cursor_mode == "id" %}selected{% endif %}>id</option>
         </select>
       </label>
+
       &nbsp;&nbsp;
+
       <label>Cursor start:
         <input type="text" name="cursor_start" value="{{ cursor_start or '' }}" />
       </label>
-      &nbsp;&nbsp;
-      <label>Cursor end (last run):
-        <input type="text" value="{{ cursor_end or '' }}" readonly />
-      </label>
+
+      {% if cursor_end %}
+        &nbsp;&nbsp;
+        <span>Last cursor end: <code>{{ cursor_end }}</code></span>
+      {% endif %}
     </fieldset>
 
-    <!-- Mapping -->
     <fieldset>
       <legend>Mapping (Formatter)</legend>
-      <p>
-        Map origin fields to target fields. Empty rows are ignored.
-        If no mapping is provided, the pipeline will try origin-native → Unified → target-native.
-      </p>
+      <p>Map origin fields to target fields. Empty rows are ignored.</p>
       <table>
         <thead>
           <tr><th>Origin field</th><th>Target field</th></tr>
@@ -113,12 +136,9 @@
       </table>
     </fieldset>
 
-    <!-- Pre-filters -->
     <fieldset>
-      <legend>Pre-filters (origin WHERE)</legend>
-      <p>
-        Applied on origin objects, using per-field <code>prefilter</code> metadata (pushed down to the warehouse).
-      </p>
+      <legend>Pre-filters (origin WHERE, pull only)</legend>
+      <p>Applied as Prefilter Conditions on origin objects (pushed down if connector supports it). Ignored for push.</p>
       <table>
         <thead>
           <tr><th>Field</th><th>Operator</th><th>Value</th></tr>
@@ -138,28 +158,26 @@
                 <select name="pre_op_{{ i }}">
                   <option value="">--</option>
                   <option value="eq">==</option>
-                  <option value="gte">&gt;=</option>
-                  <option value="lte">&lt;=</option>
                   <option value="gt">&gt;</option>
+                  <option value="gte">&gt;=</option>
                   <option value="lt">&lt;</option>
-                  <option value="in">in (comma-separated)</option>
+                  <option value="lte">&lt;=</option>
                   <option value="contains">contains</option>
+                  <option value="in">in (comma-separated)</option>
                 </select>
               </td>
-              <td><input type="text" name="pre_value_{{ i }}" /></td>
+              <td>
+                <input type="text" name="pre_value_{{ i }}" />
+              </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </fieldset>
 
-    <!-- Post-filters -->
     <fieldset>
-      <legend>Post-filters (core, after origin read)</legend>
-      <p>
-        Applied in core on native origin objects, after the read action.  
-        Any field can be used; all operators are allowed.
-      </p>
+      <legend>Post-filters (HAVING, in-memory)</legend>
+      <p>Applied in memory on native origin objects after each batch (for pull) or before pushing (for push).</p>
       <table>
         <thead>
           <tr><th>Field</th><th>Operator</th><th>Value</th></tr>
@@ -179,34 +197,60 @@
                 <select name="post_op_{{ i }}">
                   <option value="">--</option>
                   <option value="eq">==</option>
-                  <option value="gte">&gt;=</option>
-                  <option value="lte">&lt;=</option>
                   <option value="gt">&gt;</option>
+                  <option value="gte">&gt;=</option>
                   <option value="lt">&lt;</option>
-                  <option value="in">in (comma-separated)</option>
+                  <option value="lte">&lt;=</option>
                   <option value="contains">contains</option>
+                  <option value="in">in (comma-separated)</option>
                 </select>
               </td>
-              <td><input type="text" name="post_value_{{ i }}" /></td>
+              <td>
+                <input type="text" name="post_value_{{ i }}" />
+              </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </fieldset>
 
+    <fieldset>
+      <legend>Resources JSON (for push / RESOURCES mode)</legend>
+      <p>
+        When <strong>Operation = push</strong> and <strong>Push mode = resources</strong>,
+        paste a JSON array of native {{ resource }} objects for the origin connector.<br/>
+        Example:
+      </p>
+      <pre>[
+  {"job_id": "1", "title": "Engineer", "created_at": "...", "updated_at": "..."},
+  {"job_id": "2", "title": "Manager", "created_at": "...", "updated_at": "..."}
+]</pre>
+      <textarea name="resources_json">{{ resources_json }}</textarea>
+    </fieldset>
+
+    <fieldset>
+      <legend>Events JSON (for push / EVENTS mode)</legend>
+      <p>
+        When <strong>Operation = push</strong> and <strong>Push mode = events</strong>,
+        paste a JSON array of unified {{ resource }} events
+        (<code>UnifiedJobEvent</code> or <code>UnifiedProfileEvent</code>).<br/>
+        Minimal example:
+      </p>
+      {% if resource == "job" %}
+      <pre>[
+  {"event_id": "e1", "job_id": "1", "event_type": "UPDATED", "timestamp": "2024-01-01T12:00:00Z"},
+  {"event_id": "e2", "job_id": "2", "event_type": "CREATED", "timestamp": "2024-01-02T09:30:00Z"}
+]</pre>
+      {% else %}
+      <pre>[
+  {"event_id": "e1", "profile_id": "1", "event_type": "UPDATED", "timestamp": "2024-01-01T12:00:00Z"},
+  {"event_id": "e2", "profile_id": "2", "event_type": "CREATED", "timestamp": "2024-01-02T09:30:00Z"}
+]</pre>
+      {% endif %}
+      <textarea name="events_json">{{ events_json }}</textarea>
+    </fieldset>
+
     <button type="submit">Run ETL</button>
   </form>
-
-  {% if result_summary %}
-    <div style="margin-top:1rem;padding:0.5rem;border:1px solid #0a0;">
-      <strong>{{ result_summary }}</strong>
-    </div>
-  {% endif %}
-
-  {% if error_message %}
-    <div style="margin-top:1rem;padding:0.5rem;border:1px solid #a00;color:#a00;">
-      <strong>{{ error_message }}</strong>
-    </div>
-  {% endif %}
 </body>
 </html>

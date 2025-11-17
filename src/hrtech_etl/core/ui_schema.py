@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 def export_model_fields(
     model_cls: Type[BaseModel],
-    filterable_only: bool = False,
+    only_prefilterable: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Return metadata about a Pydantic model's fields for UI use.
@@ -29,6 +29,10 @@ def export_model_fields(
       ...
     ]
     """
+    fields_map = getattr(model_cls, "model_fields", None) or getattr(
+        model_cls, "__fields__", {}
+    )
+
     result: List[Dict[str, Any]] = []
 
     for name, f in fields_map.items():
@@ -45,7 +49,7 @@ def export_model_fields(
         prefilter_meta = extra.get("prefilter")
 
         # if we only want prefilterable fields, keep those that have a prefilter block
-        if filterable_only and not prefilter_meta:
+        if only_prefilterable and not prefilter_meta:
             continue
 
         field_info: Dict[str, Any] = {

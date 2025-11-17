@@ -1,88 +1,61 @@
-# hrtech_etl/connectors/warehouse_a/actions.py
-from typing import List, Tuple, Optional
-from ...core.requests import BaseRequests
-from ...core.utils import single_request
-from .models import WarehouseAJob, WarehouseAProfile
-
-Cursor = Optional[str]
-
-
-class WarehouseARequests(BaseRequests):
-
-
-    @single_request
-    def fetch_jobs(
-        self,
-        cursor: Cursor,
-        batch_size: int,
-    ) -> Tuple[List[WarehouseAJob], Cursor]:
-        resp = self._request(
-            "GET",
-            "/jobs",
-            params={"cursor": cursor, "batch_size": batch_size},
-        )
-        ...
-        return jobs, next_cursor
-
-    @single_request
-    def fetch_profiles(
-        self,
-        cursor: Cursor,
-        batch_size: int,
-    ) -> Tuple[List[WarehouseAProfile], Cursor]:
-        resp = self._request(
-            "GET",
-            "/profiles",
-            params={"cursor": cursor, "batch_size": batch_size},
-        )
-        ...
-        return profiles, next_cursor
-
-    @single_request
-    def upsert_jobs(self, jobs: List[WarehouseAJob]) -> None:
-        payload = [j.__dict__ for j in jobs]
-        self._request("POST", "/jobs/bulk_upsert", json=payload)
-
-    @single_request
-    def upsert_profiles(self, profiles: List[WarehouseAProfile]) -> None:
-        payload = [p.__dict__ for p in profiles]
-        self._request("POST", "/profiles/bulk_upsert", json=payload)
-
 # src/hrtech_etl/connectors/warehouse_a/requests.py
-from typing import List, Tuple, Optional
-from hrtech_etl.core.requests import BaseRequests
+from __future__ import annotations
+
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
+
 from .models import WarehouseAJob, WarehouseAProfile
 
-Cursor = Optional[str]
 
+class WarehouseARequests(BaseModel):
+    """
+    Low-level client for Warehouse A (HTTP, DB, SDK, ...).
+    Replace the bodies with real logic.
+    """
 
-class WarehouseARequests(BaseRequests):
-    def __init__(self, client):
-        self.client = client
+    base_url: str
+    api_key: str
+
+    # --- JOBS ---
 
     def fetch_jobs(
         self,
-        cursor: Cursor,
-        batch_size: int,
-        filters: dict | None = None,
-    ) -> Tuple[List[WarehouseAJob], Cursor]:
-        self._record_request()
-        # TODO: implement real HTTP/DB calls using self.client
-        raise NotImplementedError
-
-    def fetch_profiles(
-        self,
-        cursor: Cursor,
-        batch_size: int,
-        filters: dict | None = None,
-    ) -> Tuple[List[WarehouseAProfile], Cursor]:
-        self._record_request()
+        where: Dict[str, Any] | None,
+        cursor_start: Optional[str],
+        cursor_mode: str,
+        limit: int,
+    ) -> tuple[List[WarehouseAJob], Optional[str]]:
+        """
+        Translate `where` + cursor into query params and call Warehouse A.
+        Return (jobs, next_cursor_str_or_none).
+        """
         raise NotImplementedError
 
     def upsert_jobs(self, jobs: List[WarehouseAJob]) -> None:
-        self._record_request()
+        """
+        Upsert jobs in Warehouse A.
+        """
+        raise NotImplementedError
+
+    def fetch_jobs_by_ids(self, job_ids: List[str]) -> List[WarehouseAJob]:
+        """
+        For event-based push: fetch jobs by IDs.
+        """
+        raise NotImplementedError
+
+    # --- PROFILES ---
+
+    def fetch_profiles(
+        self,
+        where: Dict[str, Any] | None,
+        cursor_start: Optional[str],
+        cursor_mode: str,
+        limit: int,
+    ) -> tuple[List[WarehouseAProfile], Optional[str]]:
         raise NotImplementedError
 
     def upsert_profiles(self, profiles: List[WarehouseAProfile]) -> None:
-        self._record_request()
+        raise NotImplementedError
+
+    def fetch_profiles_by_ids(self, profile_ids: List[str]) -> List[WarehouseAProfile]:
         raise NotImplementedError
