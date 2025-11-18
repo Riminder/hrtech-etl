@@ -4,25 +4,9 @@ from hrtech_etl.connectors.hrflow import (
     WarehouseHrflowConnector,
     WarehouseHrflowRequests,
 )
-from hrtech_etl.connectors.hrflow.auth import HrFlowAuth
+from hrtech_etl.core.auth import ApiKeyAuth
 from hrtech_etl.core.pipeline import pull
 from hrtech_etl.core.types import Cursor, CursorMode, Resource
-
-
-def build_hrflow_connector(
-    api_key: str,
-    user_email: str,
-    board_key: str,
-) -> WarehouseHrflowConnector:
-    auth = HrFlowAuth(api_key=api_key, user_email=user_email)
-
-    requests = WarehouseHrflowRequests(
-        base_url="https://api.hrflow.ai/v1",
-        auth=auth,
-        board_key=board_key,
-    )
-
-    return WarehouseHrflowConnector(auth=auth, requests=requests)
 
 
 def parse_args() -> argparse.Namespace:
@@ -51,10 +35,10 @@ def parse_args() -> argparse.Namespace:
         help="Target HrFlow board key (destination of jobs).",
     )
     parser.add_argument(
-        "--limit",
+        "--batch-size",
         type=int,
-        default=None,
-        help="Maximum number of jobs to transfer (default: no limit).",
+        default=10,
+        help="Maximum number of jobs to transfer (default: 10).",
     )
     parser.add_argument(
         "--resource",
@@ -69,18 +53,22 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    # Origin: board A
-    origin = build_hrflow_connector(
-        api_key=args.api_key,
-        user_email="origin-team@hrflow.ai",
-        board_key=args.origin_provider_key,
+    origin = WarehouseHrflowConnector(
+        auth=ApiKeyAuth("X-API-Key", args.api_key),
+        requests=WarehouseHrflowRequests(
+            base_url="https://api.hrflow.ai/v1",
+            api_key=args.api_key,
+            provider_key=args.origin_provider_key,
+        ),
     )
 
-    # Target: board B (possibly another team)
-    target = build_hrflow_connector(
-        api_key=args.api_key,
-        user_email="target-team@hrflow.ai",
-        board_key=args.target_provider_key,
+    target = WarehouseHrflowConnector(
+        auth=ApiKeyAuth("X-API-Key", args.api_key),
+        requests=WarehouseHrflowRequests(
+            base_url="https://api.hrflow.ai/v1",
+            api_key=args.api_key,
+            provider_key=args.target_provider_key,
+        ),
     )
 
     # start from scratch (no cursor yet)
@@ -92,14 +80,22 @@ def main() -> None:
         origin=origin,
         target=target,
         cursor=cursor,
-        where=None,  # you can add prefilters later
-        having=None,  # postfilters later
-        formatter=None,  # use unified fallback Hrflow -> Unified -> Hrflow
-        batch_size=args.limit,
+        batch_size=args.batch_size,
     )
 
     print("jobs cursor_start:", cursor_jobs.start)
     print("jobs cursor_end:", cursor_jobs.end)
+
+    # # --- PULL PROFILES: HrFlow.ai -> HrFlow.ai ---
+    # cursor_profiles = pull(
+    #     resource=Resource.PROFILE,
+    #     origin=origin,
+    #     target=target,
+    #     cursor=cursor,
+    #     batch_size=5000,
+    # )
+    # print("profiles cursor_start:", cursor_profiles.start)
+    # print("profiles cursor_end:", cursor_profiles.end)
 
 
 if __name__ == "__main__":

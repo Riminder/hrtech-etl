@@ -11,6 +11,7 @@ from hrtech_etl.connectors.hrflow.models import (
     WarehouseHrflowProfile,
 )
 from hrtech_etl.core.types import CursorMode
+from hrtech_etl.core.utils import get_cursor_value
 
 
 class WarehouseHrflowRequests(BaseModel):
@@ -31,7 +32,7 @@ class WarehouseHrflowRequests(BaseModel):
         where: Dict[str, Any] | None,
         cursor_start: Optional[str],
         cursor_mode: str,
-        limit: int,
+        batch_size: int,
     ) -> tuple[List[WarehouseHrflowJob], Optional[str]]:
         """
         Translate `where` + cursor into query params and call Warehouse HrFlow.ai.
@@ -56,7 +57,7 @@ class WarehouseHrflowRequests(BaseModel):
             "location_distance": None,
             "return_job": True,
             "page": 1,
-            "limit": limit,
+            "limit": batch_size,
             "order_by": "asc",
         }
 
@@ -81,13 +82,9 @@ class WarehouseHrflowRequests(BaseModel):
         raw_jobs = resp.json().get("data", [])
 
         jobs = [WarehouseHrflowJob(**job, payload=job) for job in raw_jobs]
-
-        if cursor_mode == CursorMode.CREATED_AT.value:
-            next_cursor = jobs[-1].created_at
-        elif cursor_mode == CursorMode.UPDATED_AT.value:
-            next_cursor = jobs[-1].updated_at
-        else:
-            next_cursor = None
+        next_cursor = (
+            get_cursor_value(jobs[-1], CursorMode(cursor_mode)) if jobs else None
+        )
 
         return jobs, next_cursor
 
@@ -116,7 +113,6 @@ class WarehouseHrflowRequests(BaseModel):
                 resp.raise_for_status()
 
             # Send the upsert request
-            # Question: how to set job["reference"] correctly?
             resp = requests(
                 request_method,
                 f"{self.base_url}/job/indexing",
@@ -164,7 +160,7 @@ class WarehouseHrflowRequests(BaseModel):
         where: Dict[str, Any] | None,
         cursor_start: Optional[str],
         cursor_mode: str,
-        limit: int,
+        batch_size: int,
     ) -> tuple[List[WarehouseHrflowProfile], Optional[str]]:
         if cursor_mode not in [
             CursorMode.CREATED_AT.value,
@@ -185,7 +181,7 @@ class WarehouseHrflowRequests(BaseModel):
             "location_distance": None,
             "return_profile": True,
             "page": 1,
-            "limit": limit,
+            "limit": batch_size,
             "order_by": "asc",
         }
 
@@ -213,13 +209,11 @@ class WarehouseHrflowRequests(BaseModel):
             WarehouseHrflowProfile(**profile, payload=profile)
             for profile in raw_profiles
         ]
-
-        if cursor_mode == CursorMode.CREATED_AT.value:
-            next_cursor = profiles[-1].created_at
-        elif cursor_mode == CursorMode.UPDATED_AT.value:
-            next_cursor = profiles[-1].updated_at
-        else:
-            next_cursor = None
+        next_cursor = (
+            get_cursor_value(profiles[-1], CursorMode(cursor_mode))
+            if profiles
+            else None
+        )
 
         return profiles, next_cursor
 
@@ -245,7 +239,6 @@ class WarehouseHrflowRequests(BaseModel):
                 resp.raise_for_status()
 
             # Send the upsert request
-            # Question: how to set profile["reference"] correctly?
             resp = requests(
                 request_method,
                 f"{self.base_url}/profile/indexing",
