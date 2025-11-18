@@ -133,6 +133,7 @@ class Board(BaseModel):
     )
 
 
+# FIXME: the fields sequence are not logical enough and optionality management
 class WarehouseHrflowJob(BaseModel):
     key: str = Field(
         ...,
@@ -354,6 +355,7 @@ class Attachment(BaseModel):
     created_at: Optional[str]
 
 
+# FIXME: the fields sequence are not logical enough and optionality management
 class WarehouseHrflowProfile(BaseModel):
     key: str = Field(
         ...,

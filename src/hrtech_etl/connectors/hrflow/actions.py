@@ -21,6 +21,7 @@ class WarehouseHrflowRequests(BaseModel):
 
     base_url: str
     api_key: str
+    api_user_email: str
     provider_key: str
 
     # --- JOBS ---
@@ -43,35 +44,48 @@ class WarehouseHrflowRequests(BaseModel):
         ]:
             raise ValueError(f"Unsupported cursor mode: {cursor_mode}")
 
-        # FIXME: lister tous les paramètres possibles
-        params: Dict[str, Any] = {
+        # Question: the params here are for storing list,
+        # it needs to be adapted for searching if 'where' integrated.
+        params = {
             "board_keys": json.dumps([self.provider_key]),
+            "name": None,
+            "key": None,
+            "reference": None,
+            "location_lat": None,
+            "location_lon": None,
+            "location_distance": None,
+            "return_job": True,
             "page": 1,
             "limit": limit,
-            "return_job": "true",
             "order_by": "asc",
         }
 
         if cursor_mode == CursorMode.CREATED_AT:
             params["sort_by"] = "created_at"
+            if cursor_start:
+                params["created_at_min"] = cursor_start
         else:
             params["sort_by"] = "updated_at"
+            if cursor_start:
+                params["updated_at_min"] = cursor_start
 
         resp = requests.get(
             f"{self.base_url}/storing/jobs",
-            headers={"X-API-Key": self.api_key},
+            headers={
+                "X-API-KEY": self.api_key,
+                "X-USER-EMAIL": self.api_user_email,
+            },
             params=params,
         )
         resp.raise_for_status()
         raw_jobs = resp.json().get("data", [])
 
-        # FIXME: payload not handled, add all mapping in warehouse
-        jobs = [WarehouseHrflowJob(**job).dict() for job in raw_jobs]
+        jobs = [WarehouseHrflowJob(**job, payload=job) for job in raw_jobs]
 
         if cursor_mode == CursorMode.CREATED_AT.value:
-            next_cursor = jobs[-1].get("created_at")
+            next_cursor = jobs[-1].created_at
         elif cursor_mode == CursorMode.UPDATED_AT.value:
-            next_cursor = jobs[-1].get("updated_at")
+            next_cursor = jobs[-1].updated_at
         else:
             next_cursor = None
 
@@ -82,11 +96,34 @@ class WarehouseHrflowRequests(BaseModel):
         Upsert jobs in Warehouse HrFlow.ai.
         """
         for job in jobs:
-            # FIXME: distinguer create (post) et update (put)
-            job["reference"] = job["key"]
-            resp = requests.post(
+            # Check if it's a creation or an update
+            resp = requests.get(
                 f"{self.base_url}/job/indexing",
-                headers={"X-API-Key": self.api_key},
+                headers={
+                    "X-API-KEY": self.api_key,
+                    "X-USER-EMAIL": self.api_user_email,
+                },
+                params={
+                    "board_key": self.provider_key,
+                    "key": job.key,
+                },
+            )
+            if resp.status_code == 200:
+                request_method = "POST"
+            elif resp.status_code == 400:
+                request_method = "PUT"
+            else:
+                resp.raise_for_status()
+
+            # Send the upsert request
+            # Question: how to set job["reference"] correctly?
+            resp = requests(
+                request_method,
+                f"{self.base_url}/job/indexing",
+                headers={
+                    "X-API-KEY": self.api_key,
+                    "X-USER-EMAIL": self.api_user_email,
+                },
                 json={
                     "board_key": self.provider_key,
                     "job": job.dict(),
@@ -98,7 +135,27 @@ class WarehouseHrflowRequests(BaseModel):
         """
         For event-based push: fetch jobs by IDs.
         """
-        raise NotImplementedError
+        jobs = []
+        for key in job_ids:
+            resp = requests.get(
+                f"{self.base_url}/job/indexing",
+                headers={
+                    "X-API-KEY": self.api_key,
+                    "X-USER-EMAIL": self.api_user_email,
+                },
+                params={
+                    "board_key": self.provider_key,
+                    "key": key,
+                },
+            )
+            # Question: what if not found?
+            if resp.status_code == 200:
+                jobs.append(
+                    WarehouseHrflowJob(**resp.json().get("data"), payload=resp.json())
+                )
+            else:
+                resp.raise_for_status()
+        return jobs
 
     # --- PROFILES ---
 
@@ -109,12 +166,123 @@ class WarehouseHrflowRequests(BaseModel):
         cursor_mode: str,
         limit: int,
     ) -> tuple[List[WarehouseHrflowProfile], Optional[str]]:
-        raise NotImplementedError
+        if cursor_mode not in [
+            CursorMode.CREATED_AT.value,
+            CursorMode.UPDATED_AT.value,
+        ]:
+            raise ValueError(f"Unsupported cursor mode: {cursor_mode}")
+
+        # Question: the params here are for storing list,
+        # it needs to be adapted for searching if 'where' integrated.
+        params = {
+            "source_keys": json.dumps([self.provider_key]),
+            "name": None,
+            "key": None,
+            "email": None,
+            "reference": None,
+            "location_lat": None,
+            "location_lon": None,
+            "location_distance": None,
+            "return_profile": True,
+            "page": 1,
+            "limit": limit,
+            "order_by": "asc",
+        }
+
+        if cursor_mode == CursorMode.CREATED_AT:
+            params["sort_by"] = "created_at"
+            if cursor_start:
+                params["created_at_min"] = cursor_start
+        else:
+            params["sort_by"] = "updated_at"
+            if cursor_start:
+                params["updated_at_min"] = cursor_start
+
+        resp = requests.get(
+            f"{self.base_url}/storing/profiles",
+            headers={
+                "X-API-KEY": self.api_key,
+                "X-USER-EMAIL": self.api_user_email,
+            },
+            params=params,
+        )
+        resp.raise_for_status()
+        raw_profiles = resp.json().get("data", [])
+
+        profiles = [
+            WarehouseHrflowProfile(**profile, payload=profile)
+            for profile in raw_profiles
+        ]
+
+        if cursor_mode == CursorMode.CREATED_AT.value:
+            next_cursor = profiles[-1].created_at
+        elif cursor_mode == CursorMode.UPDATED_AT.value:
+            next_cursor = profiles[-1].updated_at
+        else:
+            next_cursor = None
+
+        return profiles, next_cursor
 
     def upsert_profiles(self, profiles: List[WarehouseHrflowProfile]) -> None:
-        raise NotImplementedError
+        for profile in profiles:
+            # Check if it's a creation or an update
+            resp = requests.get(
+                f"{self.base_url}/profile/indexing",
+                headers={
+                    "X-API-KEY": self.api_key,
+                    "X-USER-EMAIL": self.api_user_email,
+                },
+                params={
+                    "source_key": self.provider_key,
+                    "key": profile.key,
+                },
+            )
+            if resp.status_code == 200:
+                request_method = "POST"
+            elif resp.status_code == 400:
+                request_method = "PUT"
+            else:
+                resp.raise_for_status()
+
+            # Send the upsert request
+            # Question: how to set profile["reference"] correctly?
+            resp = requests(
+                request_method,
+                f"{self.base_url}/profile/indexing",
+                headers={
+                    "X-API-KEY": self.api_key,
+                    "X-USER-EMAIL": self.api_user_email,
+                },
+                json={
+                    "source_key": self.provider_key,
+                    "profile": profile.dict(),
+                },
+            )
+            resp.raise_for_status()
 
     def fetch_profiles_by_ids(
         self, profile_ids: List[str]
     ) -> List[WarehouseHrflowProfile]:
-        raise NotImplementedError
+        profiles = []
+        for key in profile_ids:
+            resp = requests.get(
+                f"{self.base_url}/profile/indexing",
+                headers={
+                    "X-API-KEY": self.api_key,
+                    "X-USER-EMAIL": self.api_user_email,
+                },
+                params={
+                    "source_key": self.provider_key,
+                    "key": key,
+                },
+            )
+            # Question: what if not found?
+            if resp.status_code == 200:
+                profiles.append(
+                    WarehouseHrflowProfile(
+                        **resp.json().get("data"), payload=resp.json()
+                    )
+                )
+            else:
+                resp.raise_for_status()
+        return profiles
