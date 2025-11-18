@@ -133,7 +133,6 @@ class Board(BaseModel):
     )
 
 
-# FIXME: the fields sequence are not logical enough and optionality management
 class WarehouseHrflowJob(BaseModel):
     key: str = Field(
         ...,
@@ -149,13 +148,6 @@ class WarehouseHrflowJob(BaseModel):
         },
         description="Custom identifier of the Job.",
     )
-    name: str = Field(
-        ...,
-        json_schema_extra={
-            "prefilter": {"operators": ["eq", "contains"]},
-        },
-        description="Job title.",
-    )
     board_key: str = Field(
         ...,
         json_schema_extra={
@@ -163,8 +155,43 @@ class WarehouseHrflowJob(BaseModel):
         },
         description="Identification key of the Board attached to the Job.",
     )
+    board: Optional[Board]  # FIXME: is this obsolete ?
+    created_at: Optional[str] = Field(
+        ...,
+        json_schema_extra={
+            "cursor": ["created_at"],
+            "prefilter": {"operators": ["gte", "lte"]},
+        },
+        description="type: datetime ISO8601, Creation date of the Job.",
+    )
+    updated_at: str = Field(
+        ...,
+        json_schema_extra={
+            "cursor": ["updated_at"],
+            "prefilter": {"operators": ["gte", "lte"]},
+        },
+        description="type: datetime ISO8601, Last update date of the Job.",
+    )
+    archived_at: Optional[str] = Field(
+        None,
+        description=(
+            "type: datetime ISO8601, Archive date of the Job. "
+            "The value is null for unarchived Jobs."
+        ),
+    )
+    name: str = Field(
+        ...,
+        json_schema_extra={
+            "prefilter": {"operators": ["eq", "contains"]},
+        },
+        description="Job title.",
+    )
+    summary: Optional[str] = Field(None, description="Brief summary of the Job.")
     location: Location = Field(..., description="Job location object.")
-    sections: List[Section] = Field(None, description="Job custom sections.")
+    url: Optional[str] = Field(None, description="Job post original URL.")
+    sections: List[Section] = Field(
+        None, description="Job custom sections."
+    )  # FIXME: deprecation in progress
     culture: Optional[str] = Field(
         None, description="Describes the company's values, work environment, and ethos."
     )
@@ -181,46 +208,20 @@ class WarehouseHrflowJob(BaseModel):
     interviews: Optional[str] = Field(
         None, description="Provides information about the interview process and stages."
     )
-    url: Optional[str] = Field(None, description="Job post original URL.")
-    summary: Optional[str] = Field(None, description="Brief summary of the Job.")
-    board: Optional[Board]
-    archived_at: Optional[str] = Field(
-        None,
-        description=(
-            "type: datetime ISO8601, Archive date of the Job. "
-            "The value is null for unarchived Jobs."
-        ),
-    )
-    updated_at: str = Field(
-        ...,
-        json_schema_extra={
-            "cursor": ["updated_at"],
-            "prefilter": {"operators": ["gte", "lte"]},
-        },
-        description="type: datetime ISO8601, Last update date of the Job.",
-    )
-    created_at: Optional[str] = Field(
-        ...,
-        json_schema_extra={
-            "cursor": ["created_at"],
-            "prefilter": {"operators": ["gte", "lte"]},
-        },
-        description="type: datetime ISO8601, Creation date of the Job.",
-    )
     skills: Optional[List[Skill]] = Field(
         None, description="List of skills of the Job."
     )
     languages: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of spoken languages of the Job"
     )
+    tasks: Optional[List[GeneralEntitySchema]] = Field(
+        None, description="List of tasks of the Job"
+    )
     certifications: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of certifications of the Job."
     )
     courses: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of courses of the Job"
-    )
-    tasks: Optional[List[GeneralEntitySchema]] = Field(
-        None, description="List of tasks of the Job"
     )
     tags: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of tags of the Job"
@@ -271,23 +272,28 @@ class Experience(BaseModel):
     key: Optional[str] = Field(
         None, description="Identification key of the Experience."
     )
-    company: Optional[str] = Field(None, description="Company name of the Experience.")
-    logo: Optional[str] = Field(None, description="Logo of the Company.")
     title: Optional[str] = Field(None, description="Title of the Experience.")
-    description: Optional[str] = Field(
-        None, description="Description of the Experience."
-    )
-    location: Optional[Location] = Field(
-        None, description="Location object of the Experience."
-    )
+    company: Optional[str] = Field(None, description="Company name of the Experience.")
     date_start: Optional[str] = Field(
         None, description="Start date of the experience. type: ('datetime ISO 8601')"
     )
     date_end: Optional[str] = Field(
         None, description="End date of the experience. type: ('datetime ISO 8601')"
     )
+    location: Optional[Location] = Field(
+        None, description="Location object of the Experience."
+    )
+    description: Optional[str] = Field(
+        None, description="Description of the Experience."
+    )
     skills: Optional[List[Skill]] = Field(
         None, description="List of skills of the Experience."
+    )
+    languages: Optional[List[GeneralEntitySchema]] = Field(
+        None, description="List of spoken languages of the profile"
+    )
+    tasks: Optional[List[GeneralEntitySchema]] = Field(
+        None, description="List of tasks of the Experience."
     )
     certifications: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of certifications of the Experience."
@@ -295,36 +301,36 @@ class Experience(BaseModel):
     courses: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of courses of the Experience."
     )
-    tasks: Optional[List[GeneralEntitySchema]] = Field(
-        None, description="List of tasks of the Experience."
-    )
-    languages: Optional[List[GeneralEntitySchema]] = Field(
-        None, description="List of spoken languages of the profile"
-    )
     interests: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of interests of the Experience."
     )
+    logo: Optional[str] = Field(None, description="Logo of the Company.")
 
 
 class Education(BaseModel):
     key: Optional[str] = Field(None, description="Identification key of the Education.")
-    school: Optional[str] = Field(None, description="School name of the Education.")
-    logo: Optional[str] = Field(None, description="Logo of the School.")
     title: Optional[str] = Field(None, description="Title of the Education.")
-    description: Optional[str] = Field(
-        None, description="Description of the Education."
-    )
-    location: Optional[Location] = Field(
-        None, description="Location object of the Education."
-    )
+    school: Optional[str] = Field(None, description="School name of the Education.")
     date_start: Optional[str] = Field(
         None, description="Start date of the Education. type: ('datetime ISO 8601')"
     )
     date_end: Optional[str] = Field(
         None, description="End date of the Education. type: ('datetime ISO 8601')"
     )
+    location: Optional[Location] = Field(
+        None, description="Location object of the Education."
+    )
+    description: Optional[str] = Field(
+        None, description="Description of the Education."
+    )
     skills: Optional[List[Skill]] = Field(
         None, description="List of skills of the Education."
+    )
+    languages: Optional[List[GeneralEntitySchema]] = Field(
+        None, description="List of spoken languages of the profile"
+    )
+    tasks: Optional[List[GeneralEntitySchema]] = Field(
+        None, description="List of tasks of the Education."
     )
     certifications: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of certifications of the Education."
@@ -332,30 +338,24 @@ class Education(BaseModel):
     courses: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of courses of the Education."
     )
-    tasks: Optional[List[GeneralEntitySchema]] = Field(
-        None, description="List of tasks of the Education."
-    )
-    languages: Optional[List[GeneralEntitySchema]] = Field(
-        None, description="List of spoken languages of the profile"
-    )
     interests: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of interests of the Experience."
     )
+    logo: Optional[str] = Field(None, description="Logo of the School.")
 
 
 class Attachment(BaseModel):
+    created_at: Optional[str]
+    updated_at: Optional[str]
+    original_file_name: Optional[str]
+    extension: Optional[str]
     type: Optional[str]
     alt: Optional[str]
     file_size: Optional[str]
     file_name: Optional[str]
-    original_file_name: Optional[str]
-    extension: Optional[str]
     public_url: Optional[str]
-    updated_at: Optional[str]
-    created_at: Optional[str]
 
 
-# FIXME: the fields sequence are not logical enough and optionality management
 class WarehouseHrflowProfile(BaseModel):
     key: str = Field(
         ...,
@@ -377,17 +377,13 @@ class WarehouseHrflowProfile(BaseModel):
             "prefilter": {"operators": ["eq", "in", "contains"]},
         },
     )
-    info: ProfileInfo = Field(..., description="Object containing the Profile's info.")
-    text_language: Optional[str] = Field(
-        None, description="Code language of the Profile. type: string code ISO 639-1"
-    )
-    text: str = Field(..., description="Full text of the Profile..")
-    archived_at: Optional[str] = Field(
-        None,
-        description=(
-            "type: datetime ISO8601, Archive date of the Profile."
-            " The value is null for unarchived Profiles."
-        ),
+    created_at: str = Field(
+        ...,
+        json_schema_extra={
+            "cursor": ["created_at"],
+            "prefilter": {"operators": ["gte", "lte"]},
+        },
+        description="type: datetime ISO8601, Creation date of the Profile.",
     )
     updated_at: str = Field(
         ...,
@@ -397,13 +393,17 @@ class WarehouseHrflowProfile(BaseModel):
         },
         description="type: datetime ISO8601, Last update date of the Profile.",
     )
-    created_at: str = Field(
-        ...,
-        json_schema_extra={
-            "cursor": ["created_at"],
-            "prefilter": {"operators": ["gte", "lte"]},
-        },
-        description="type: datetime ISO8601, Creation date of the Profile.",
+    archived_at: Optional[str] = Field(
+        None,
+        description=(
+            "type: datetime ISO8601, Archive date of the Profile."
+            " The value is null for unarchived Profiles."
+        ),
+    )
+    info: ProfileInfo = Field(..., description="Object containing the Profile's info.")
+    text: str = Field(..., description="Full text of the Profile..")
+    text_language: Optional[str] = Field(
+        None, description="Code language of the Profile. type: string code ISO 639-1"
     )
     experiences_duration: float = Field(
         None, description="Total number of years of experience."
@@ -426,14 +426,14 @@ class WarehouseHrflowProfile(BaseModel):
     languages: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of spoken languages of the profile"
     )
+    tasks: Optional[List[GeneralEntitySchema]] = Field(
+        None, description="List of tasks of the Profile."
+    )
     certifications: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of certifications of the Profile."
     )
     courses: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of courses of the Profile."
-    )
-    tasks: Optional[List[GeneralEntitySchema]] = Field(
-        None, description="List of tasks of the Profile."
     )
     interests: Optional[List[GeneralEntitySchema]] = Field(
         None, description="List of interests of the Profile."
