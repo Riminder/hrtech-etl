@@ -58,6 +58,7 @@ def main() -> None:
         requests=WarehouseHrflowRequests(
             base_url="https://api.hrflow.ai/v1",
             api_key=args.api_key,
+            api_user_email=args.user_email,
             provider_key=args.origin_provider_key,
         ),
     )
@@ -67,6 +68,7 @@ def main() -> None:
         requests=WarehouseHrflowRequests(
             base_url="https://api.hrflow.ai/v1",
             api_key=args.api_key,
+            api_user_email=args.user_email,
             provider_key=args.target_provider_key,
         ),
     )
