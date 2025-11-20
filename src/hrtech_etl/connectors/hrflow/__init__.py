@@ -13,9 +13,9 @@ from hrtech_etl.core.models import (
     UnifiedProfileEvent,
 )
 from hrtech_etl.core.registry import ConnectorMeta, register_connector
-from hrtech_etl.core.types import Condition, CursorMode, WarehouseType
+from hrtech_etl.core.types import Condition, Cursor, CursorMode, WarehouseType
 
-from .actions import WarehouseHrflowRequests
+from .actions import WarehouseHrflowActions
 from .models import (
     WarehouseHrflowJob,
     WarehouseHrflowJobEvent,
@@ -28,12 +28,12 @@ class WarehouseHrflowConnector(BaseConnector):
     job_native_cls = WarehouseHrflowJob
     profile_native_cls = WarehouseHrflowProfile
 
-    def __init__(self, auth: BaseAuth, requests: WarehouseHrflowRequests) -> None:
+    def __init__(self, auth: BaseAuth, actions: WarehouseHrflowActions) -> None:
         super().__init__(
             auth=auth,
             name="warehouse_hrflow",
             warehouse_type=WarehouseType.CUSTOMERS,
-            requests=requests,
+            actions=actions,
         )
 
     # -------- JOBS: unified ↔ native --------
@@ -66,9 +66,8 @@ class WarehouseHrflowConnector(BaseConnector):
 
     def read_jobs_batch(
         self,
-        where: list[Condition] | None,
-        cursor_start: Optional[str] = None,
-        cursor_mode: CursorMode = CursorMode.UPDATED_AT,
+        cursor: Cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
+        where: list[Condition] | None = None,
         batch_size: int = 1000,
     ) -> Tuple[List[BaseModel], Optional[str]]:
         where_payload: Dict[str, Any] | None = None
@@ -81,29 +80,16 @@ class WarehouseHrflowConnector(BaseConnector):
                     where_payload[cond.field] = cond.value
                 # TODO: mapper gte/lte/contains → syntaxe de l’API A
 
-        jobs, next_cursor = self.requests.fetch_jobs(
+        jobs, next_cursor = self.actions.fetch_jobs(
+            cursor=cursor,
             where=where_payload,
-            cursor_start=cursor_start,
-            cursor_mode=cursor_mode.value,
             batch_size=batch_size,
         )
         return jobs, next_cursor
 
     def _write_jobs_native(self, jobs: List[BaseModel]) -> None:
         assert all(isinstance(j, WarehouseHrflowJob) for j in jobs)
-        self.requests.upsert_jobs(jobs)  # type: ignore[arg-type]
-
-    def get_cursor_from_native_job(
-        self, native_job: BaseModel, cursor_mode: CursorMode
-    ) -> Optional[str]:
-        assert isinstance(native_job, WarehouseHrflowJob)
-        if cursor_mode == CursorMode.ID:
-            return native_job.job_id
-        if cursor_mode == CursorMode.CREATED_AT:
-            return native_job.created_at.isoformat()
-        if cursor_mode == CursorMode.UPDATED_AT:
-            return native_job.updated_at.isoformat()
-        return None
+        self.actions.upsert_jobs(jobs)  # type: ignore[arg-type]
 
     def get_job_id(self, native_job: BaseModel) -> str:
         assert isinstance(native_job, WarehouseHrflowJob)
@@ -138,9 +124,8 @@ class WarehouseHrflowConnector(BaseConnector):
 
     def read_profiles_batch(
         self,
-        where: list[Condition] | None,
-        cursor_start: Optional[str] = None,
-        cursor_mode: CursorMode = CursorMode.UPDATED_AT,
+        cursor: Cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
+        where: list[Condition] | None = None,
         batch_size: int = 1000,
     ) -> Tuple[List[BaseModel], Optional[str]]:
         where_payload: Dict[str, Any] | None = None
@@ -151,29 +136,17 @@ class WarehouseHrflowConnector(BaseConnector):
                 if cond.op.value == "eq":
                     where_payload[cond.field] = cond.value
 
-        profiles, next_cursor = self.requests.fetch_profiles(
+        profiles, next_cursor = self.actions.fetch_profiles(
+            cursor=cursor,
             where=where_payload,
-            cursor_start=cursor_start,
-            cursor_mode=cursor_mode.value,
             batch_size=batch_size,
         )
         return profiles, next_cursor
 
     def _write_profiles_native(self, profiles: List[BaseModel]) -> None:
         assert all(isinstance(p, WarehouseHrflowProfile) for p in profiles)
-        self.requests.upsert_profiles(profiles)  # type: ignore[arg-type]
+        self.actions.upsert_profiles(profiles)  # type: ignore[arg-type]
 
-    def get_cursor_from_native_profile(
-        self, native_profile: BaseModel, cursor_mode: CursorMode
-    ) -> Optional[str]:
-        assert isinstance(native_profile, WarehouseHrflowProfile)
-        if cursor_mode == CursorMode.ID:
-            return native_profile.profile_id
-        if cursor_mode == CursorMode.CREATED_AT:
-            return native_profile.created_at.isoformat()
-        if cursor_mode == CursorMode.UPDATED_AT:
-            return native_profile.updated_at.isoformat()
-        return None
 
     def get_profile_id(self, native_profile: BaseModel) -> str:
         assert isinstance(native_profile, WarehouseHrflowProfile)
@@ -191,7 +164,7 @@ class WarehouseHrflowConnector(BaseConnector):
         self, events: Iterable[UnifiedJobEvent]
     ) -> List[BaseModel]:
         job_ids = [ev.job_id for ev in events]
-        return self.requests.fetch_jobs_by_ids(job_ids)
+        return self.actions.fetch_jobs_by_ids(job_ids)
 
     # -------- EVENTS: PROFILES --------
 
@@ -205,7 +178,13 @@ class WarehouseHrflowConnector(BaseConnector):
         self, events: Iterable[UnifiedProfileEvent]
     ) -> List[BaseModel]:
         profile_ids = [ev.profile_id for ev in events]
-        return self.requests.fetch_profiles_by_ids(profile_ids)
+        return self.actions.fetch_profiles_by_ids(profile_ids)
+
+    # --- WHERE FILTER HELPERS ---
+
+    def build_connector_query_params(self, resource, cursor = ..., where = None, cursor_min_native_name = None, 
+                                     cursor_max_native_name = None, sort_by_native_name = "sort_by", sort_by_native_value = "asc", batch_size = 1000):
+        return super().build_connector_query_params(resource, cursor, where, cursor_min_native_name, cursor_max_native_name, sort_by_native_name, sort_by_native_value, batch_size)
 
 
 # ---------- Factory + Registry registration ----------
@@ -218,13 +197,13 @@ def _build_default_connector() -> WarehouseHrflowConnector:
     """
     # Question: why do we have the redundant api key usage ?
     auth = ApiKeyAuth("X-API-Key", "dummy_api_key")
-    requests = WarehouseHrflowRequests(
+    actions = WarehouseHrflowActions(
         base_url="https://api.hrflow.ai/v1",
         api_key="dummy_api_key",
         api_user_email="dummy@example.com",
         provider_key="dummy_board_key",
     )
-    return WarehouseHrflowConnector(auth=auth, requests=requests)
+    return WarehouseHrflowConnector(auth=auth, actions=actions)
 
 
 # Register for UI / config usage
@@ -251,5 +230,5 @@ __all__ = [
     "WarehouseHrflowProfile",
     "WarehouseHrflowJobEvent",
     "WarehouseHrflowProfileEvent",
-    "WarehouseHrflowRequests",
+    "WarehouseHrflowActions",
 ]

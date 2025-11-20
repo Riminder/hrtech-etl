@@ -22,7 +22,7 @@ class WarehouseType(str, Enum):
 
 
 class CursorMode(str, Enum):
-    ID = "id"
+    UID = "uid"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
 
@@ -31,6 +31,7 @@ class Cursor(BaseModel):
     mode: CursorMode
     start: Optional[str] = None  # input
     end: Optional[str] = None  # output (filled by pipeline)
+    sort_by: str = "asc"  # "asc" | "desc" #todo add to playgroudn & fastapi
 
 
 class Operator(str, Enum):
@@ -77,3 +78,8 @@ class PushResult(BaseModel):
     skipped_missing: int = 0
     skipped_having: int = 0
     errors: list[str] = []
+
+
+class BoolJoin(str, Enum):
+    AND = "and"
+    OR = "or"

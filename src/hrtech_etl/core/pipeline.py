@@ -10,7 +10,7 @@ from .connector import BaseConnector
 from .models import UnifiedJobEvent, UnifiedProfileEvent
 from .registry import get_connector_instance
 from .types import Condition, Cursor, Formatter, PushMode, PushResult, Resource
-from .utils import apply_postfilters, safe_format_resources
+from .utils import apply_postfilters, safe_format_resources, get_cursor_native_value
 
 # -------- PULL RESOURCES: JOBS or PROFILES --------
 
@@ -43,9 +43,8 @@ def pull(
         # 1) Read native resources from origin (with prefilters translated to query)
         native_resources, current = origin.read_resources_batch(
             resource=resource,
+            cursor=cursor,
             where=where,
-            cursor_start=current,
-            cursor_mode=cursor.mode,
             batch_size=batch_size,
         )
         if not native_resources:
@@ -61,10 +60,10 @@ def pull(
             continue
 
         # 3) Compute last_cursor from the *last* native resource in this batch
-        last_cursor = origin.get_cursor_from_native_resource(
-            resource, native_resources[-1], cursor.mode
+        last_cursor = get_cursor_native_value(
+            native_resources[-1], cursor.mode
         )
-
+        # 4) Format & write to target
         formatted_resources = safe_format_resources(
             resource, origin, target, formatter, native_resources
         )

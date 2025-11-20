@@ -38,7 +38,7 @@ Opensource ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM
 3. [FastAPI App: API vs Playground](#fastapi-app-api-vs-playground)  
 4. [Core Concepts](#core-concepts)  
    4.1. [Resources & Push Modes](#41-resources--push-modes)  
-   4.2. [Connectors & Requests](#42-connectors--requests)  
+   4.2. [Connectors & Actions](#42-connectors--actions)  
    4.3. [Native & Unified Models](#43-native--unified-models)  
    4.4. [Cursor & Cursor Modes](#44-cursor--cursor-modes)  
    4.5. [Formatters](#45-formatters)  
@@ -85,24 +85,24 @@ from hrtech_etl.core.types import Resource, Cursor, CursorMode
 from hrtech_etl.core.auth import ApiKeyAuth, BearerAuth
 from hrtech_etl.core.pipeline import pull
 
-from hrtech_etl.connectors.warehouse_a import WarehouseAConnector, WarehouseARequests
-from hrtech_etl.connectors.warehouse_b import WarehouseBConnector, WarehouseBRequests
+from hrtech_etl.connectors.warehouse_a import WarehouseAConnector, WarehouseAActions
+from hrtech_etl.connectors.warehouse_b import WarehouseBConnector, WarehouseBActions
 from hrtech_etl.formatters import a_to_b
 
 # --- Instantiate connectors ---
 
 origin = WarehouseAConnector(
     auth=ApiKeyAuth("X-API-Key", "AAA"),
-    requests=WarehouseARequests(client_a),
+    actions=WarehouseAActions(client_a),
 )
 
 target = WarehouseBConnector(
     auth=BearerAuth("BBB"),
-    requests=WarehouseBRequests(client_b),
+    actions=WarehouseBActions(client_b),
 )
 
 # start from scratch (no cursor yet)
-cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None)
+cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc")
 
 # --- PULL JOBS: A -> B ---
 cursor_jobs = pull(
@@ -204,7 +204,7 @@ print("pushed:", result.total_resources_pushed)
 
 Under the hood for `PushMode.EVENTS`:
 
-1. The connector translates **unified events** → internal fetch requests:
+1. The connector translates **unified events** → internal fetch actions:
 
    * `fetch_resources_by_events(Resource.JOB, events)`
 2. Core applies `having` (postfilters) to the **native** jobs.
@@ -489,7 +489,7 @@ All pull/push operations are parameterized by `resource`.
 
 ---
 
-### 4.2. Connectors & Requests
+### 4.2. Connectors & Actions
 
 * **BaseConnector** (`core/connector.py`):
 
@@ -499,9 +499,8 @@ All pull/push operations are parameterized by `resource`.
     * `profile_native_cls`
   * Implements generic resource methods:
 
-    * `read_resources_batch(resource, where, cursor_start, cursor_mode, batch_size)`
+    * `read_resources_batch(resource, where, cursor, batch_size)`
     * `write_resources_batch(resource, resources)`
-    * `get_cursor_from_native_resource(resource, native, cursor_mode)`
     * `get_resource_id(resource, native)`
     * `parse_resource_event(resource, raw)`
     * `fetch_resources_by_events(resource, events)`
@@ -509,7 +508,7 @@ All pull/push operations are parameterized by `resource`.
 * **Per-warehouse connectors** (`connectors/warehouse_a`, `connectors/warehouse_b`, ...):
 
   * Implement `BaseConnector` for their system.
-  * Use a `Requests` class (e.g. `WarehouseARequests`) to actually call HTTP / DB.
+  * Use a `Actions` class (e.g. `WarehouseAActions`) to actually call HTTP / DB.
 
 ---
 
@@ -568,7 +567,7 @@ class WarehouseAJob(BaseModel):
     )
 ```
 
-Core uses `get_cursor_from_native_resource(...)` to extract the right value based on `CursorMode`.
+Core uses `get_cursor_native_value(...), get_cursor_native_value` to extract the right name and value based on `CursorMode`.
 
 ---
 
@@ -648,12 +647,12 @@ hrtech-etl/
 │     │  ├─ warehouse_a/
 │     │  │  ├─ __init__.py   # WarehouseAConnector + registration
 │     │  │  ├─ models.py     # WarehouseAJob, WarehouseAProfile
-│     │  │  ├─ requests.py   # WarehouseARequests (HTTP/DB client)
+│     │  │  ├─ actions.py   # WarehouseAActions (HTTP/DB client)
 │     │  │  └─ test.py       # connector tests
 │     │  └─ warehouse_b/
 │     │     ├─ __init__.py
 │     │     ├─ models.py
-│     │     ├─ requests.py
+│     │     ├─ actions.py
 │     │     └─ test.py
 │     │
 │     └─ formatters/

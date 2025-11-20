@@ -1,4 +1,4 @@
-# src/hrtech_etl/connectors/warehouse_a/requests.py
+# src/hrtech_etl/connectors/warehouse_a/actions.py
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -6,9 +6,10 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 from .models import WarehouseAJob, WarehouseAProfile
+from hrtech_etl.core.types import Cursor, CursorMode, Condition
 
 
-class WarehouseARequests(BaseModel):
+class WarehouseAActions(BaseModel):
     """
     Low-level client for Warehouse A (HTTP, DB, SDK, ...).
     Replace the bodies with real logic.
@@ -21,10 +22,9 @@ class WarehouseARequests(BaseModel):
 
     def fetch_jobs(
         self,
-        where: Dict[str, Any] | None,
-        cursor_start: Optional[str],
-        cursor_mode: str,
-        limit: int,
+        cursor: Cursor=Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
+        where: Dict[str, Any] | None = None,
+        batch_size: int= 1000,
     ) -> tuple[List[WarehouseAJob], Optional[str]]:
         """
         Translate `where` + cursor into query params and call Warehouse A.
@@ -48,10 +48,9 @@ class WarehouseARequests(BaseModel):
 
     def fetch_profiles(
         self,
-        where: Dict[str, Any] | None,
-        cursor_start: Optional[str],
-        cursor_mode: str,
-        limit: int,
+        where: list[Condition] | None,
+        cursor: Cursor=Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
+        batch_size: int= 1000,
     ) -> tuple[List[WarehouseAProfile], Optional[str]]:
         raise NotImplementedError
 

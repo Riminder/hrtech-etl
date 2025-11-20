@@ -174,6 +174,7 @@ def _build_context(
     cursor_mode: Optional[str],
     cursor_start: Optional[str],
     cursor_end: Optional[str],
+    cursor_sort_by: Optional[str],
     origin_fields: List[dict],
     target_fields: List[dict],
     origin_prefilter_fields: List[dict],
@@ -194,6 +195,7 @@ def _build_context(
         "cursor_mode": cursor_mode,
         "cursor_start": cursor_start,
         "cursor_end": cursor_end,
+        "cursor_sort_by": cursor_sort_by,
         "origin_fields": origin_fields,
         "target_fields": target_fields,
         "origin_prefilter_fields": origin_prefilter_fields,
@@ -245,11 +247,13 @@ async def playground(request: Request):
     cursor_mode_str = form.get("cursor_mode") or CursorMode.UPDATED_AT.value
     cursor_mode_enum = CursorMode(cursor_mode_str)
     cursor_start = form.get("cursor_start") or None
+    cursor_sort_by_str = form.get("cursor_sort_by") or None
 
     cursor = Cursor(
         mode=cursor_mode_enum,
         start=cursor_start,
         end=None,
+        sort_by=cursor_sort_by_str or "asc",
     )
 
     resources_json = form.get("resources_json") or ""
@@ -378,6 +382,7 @@ async def playground(request: Request):
         cursor_mode=cursor.mode.value if cursor else None,
         cursor_start=cursor.start if cursor else None,
         cursor_end=cursor.end if cursor else None,
+        cursor_sort_by=cursor.sort_by.value if cursor else None,
         origin_fields=origin_fields,
         target_fields=target_fields,
         origin_prefilter_fields=origin_prefilter_fields,

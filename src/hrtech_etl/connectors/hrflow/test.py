@@ -2,7 +2,7 @@ import argparse
 
 from hrtech_etl.connectors.hrflow import (
     WarehouseHrflowConnector,
-    WarehouseHrflowRequests,
+    WarehouseHrflowActions,
 )
 from hrtech_etl.core.auth import ApiKeyAuth
 from hrtech_etl.core.pipeline import pull
@@ -55,7 +55,7 @@ def main() -> None:
 
     origin = WarehouseHrflowConnector(
         auth=ApiKeyAuth("X-API-Key", args.api_key),
-        requests=WarehouseHrflowRequests(
+        actions=WarehouseHrflowActions(
             base_url="https://api.hrflow.ai/v1",
             api_key=args.api_key,
             api_user_email=args.user_email,
@@ -65,7 +65,7 @@ def main() -> None:
 
     target = WarehouseHrflowConnector(
         auth=ApiKeyAuth("X-API-Key", args.api_key),
-        requests=WarehouseHrflowRequests(
+        actions=WarehouseHrflowActions(
             base_url="https://api.hrflow.ai/v1",
             api_key=args.api_key,
             api_user_email=args.user_email,
@@ -74,7 +74,7 @@ def main() -> None:
     )
 
     # start from scratch (no cursor yet)
-    cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None)
+    cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc")
 
     # --- PULL JOBS: HrFlow.ai -> HrFlow.ai ---
     cursor_jobs = pull(

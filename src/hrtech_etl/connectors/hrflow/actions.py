@@ -10,11 +10,11 @@ from hrtech_etl.connectors.hrflow.models import (
     WarehouseHrflowJob,
     WarehouseHrflowProfile,
 )
-from hrtech_etl.core.types import CursorMode
-from hrtech_etl.core.utils import get_cursor_value
+from hrtech_etl.core.types import Cursor, CursorMode
+from hrtech_etl.core.utils import get_cursor_native_value, get_cursor_native_value
 
 
-class WarehouseHrflowRequests(BaseModel):
+class WarehouseHrflowActions(BaseModel):
     """
     Low-level client for Warehouse A (HTTP, DB, SDK, ...).
     Replace the bodies with real logic.
@@ -30,14 +30,16 @@ class WarehouseHrflowRequests(BaseModel):
     def fetch_jobs(
         self,
         where: Dict[str, Any] | None,
-        cursor_start: Optional[str],
-        cursor_mode: str,
+        cursor: Cursor,
         batch_size: int,
     ) -> tuple[List[WarehouseHrflowJob], Optional[str]]:
         """
         Translate `where` + cursor into query params and call Warehouse HrFlow.ai.
         Return (jobs, next_cursor_str_or_none).
         """
+        cursor_start = cursor.start
+        cursor_mode = cursor.mode.value
+        sort_by = cursor.sort_by.value  
 
         if cursor_mode not in [
             CursorMode.CREATED_AT.value,
@@ -83,7 +85,7 @@ class WarehouseHrflowRequests(BaseModel):
 
         jobs = [WarehouseHrflowJob(**job, payload=job) for job in raw_jobs]
         next_cursor = (
-            get_cursor_value(jobs[-1], CursorMode(cursor_mode)) if jobs else None
+            get_cursor_native_value(jobs[-1], CursorMode(cursor_mode)) if jobs else None
         )
 
         return jobs, next_cursor
@@ -210,7 +212,7 @@ class WarehouseHrflowRequests(BaseModel):
             for profile in raw_profiles
         ]
         next_cursor = (
-            get_cursor_value(profiles[-1], CursorMode(cursor_mode))
+            get_cursor_native_value(profiles[-1], CursorMode(cursor_mode))
             if profiles
             else None
         )

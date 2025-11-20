@@ -19,7 +19,7 @@ class WarehouseAJob(BaseModel):
         ...,
         json_schema_extra={
             # candidates for cursor modes
-            "cursor": ["id"],
+            "cursor": CursorMode.UID.value,
             # prefilter metadata (used by Prefilter + UI)
             "prefilter": {"operators": ["eq", "in", "contains"]},
         },
@@ -33,14 +33,14 @@ class WarehouseAJob(BaseModel):
     created_at: datetime = Field(
         ...,
         json_schema_extra={
-            "cursor": ["created_at"],
+            "cursor": CursorMode.CREATED_AT.value,
             "prefilter": {"operators": ["gte", "lte"]},
         },
     )
     updated_at: datetime = Field(
         ...,
         json_schema_extra={
-            "cursor": ["updated_at"],
+            "cursor": CursorMode.UPDATED_AT.value,
             "prefilter": {"operators": ["gte", "lte"]},
         },
     )
@@ -55,7 +55,7 @@ class WarehouseAProfile(BaseModel):
     profile_id: str = Field(
         ...,
         json_schema_extra={
-            "cursor": ["id"],
+            "cursor": CursorMode.UID.value,
             "prefilter": {"operators": ["eq", "in", "contains"]},
         },
     )
@@ -68,14 +68,14 @@ class WarehouseAProfile(BaseModel):
     created_at: datetime = Field(
         ...,
         json_schema_extra={
-            "cursor": ["created_at"],
+            "cursor": CursorMode.CREATED_AT.value,
             "prefilter": {"operators": ["gte", "lte"]},
         },
     )
     updated_at: datetime = Field(
         ...,
         json_schema_extra={
-            "cursor": ["updated_at"],
+            "cursor": CursorMode.UPDATED_AT.value,
             "prefilter": {"operators": ["gte", "lte"]},
         },
     )
@@ -143,7 +143,7 @@ class WarehouseAJobEvent(BaseModel):
             event_type = JobEventType.UPSERTED
 
         cursor = Cursor(
-            mode=CursorMode.ID,
+            mode=CursorMode.UID,
             start=self.event_id,
             end=self.event_id,
         )
@@ -203,7 +203,7 @@ class WarehouseAProfileEvent(BaseModel):
             event_type = ProfileEventType.UPSERTED
 
         cursor = Cursor(
-            mode=CursorMode.ID,
+            mode=CursorMode.UID,
             start=self.event_id,
             end=self.event_id,
         )

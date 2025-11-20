@@ -1,20 +1,20 @@
-# hrtech_etl/core/requests.py
+# hrtech_etl/core/actions.py
 from typing import Any, Protocol
 
 
 class RequestClient(Protocol):
     """
     Protocol for clients that provide a 'request' method.
-    This ensures type checking for the client passed to BaseRequests.
+    This ensures type checking for the client passed to BaseActions.
     """
 
     def request(self, *args: Any, **kwargs: Any) -> Any: ...
 
 
-class BaseRequests:
+class BaseActions:
     def __init__(self, client: RequestClient):
         """
-        Initializes the BaseRequests with a client.
+        Initializes the BaseActions with a client.
         Base class for connector-specific request layers.
 
         The client is expected to provide a 'request' method for I/O operations.

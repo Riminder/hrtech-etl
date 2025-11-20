@@ -76,12 +76,12 @@ hrtech-etl/
 │     │  ├─ warehouse_a/
 │     │  │  ├─ __init__.py   # WarehouseAConnector + registration
 │     │  │  ├─ models.py     # WarehouseAJob, WarehouseAProfile (Pydantic, cursor & prefilter metadata)
-│     │  │  ├─ requests.py   # low-level client / HTTP/DB access for warehouse A
+│     │  │  ├─ actions.py   # low-level client / HTTP/DB access for warehouse A
 │     │  │  └─ test.py       # connector-specific tests
 │     │  └─ warehouse_b/
 │     │     ├─ __init__.py
 │     │     ├─ models.py
-│     │     ├─ requests.py
+│     │     ├─ actions.py
 │     │     └─ test.py
 │     │
 │     └─ formatters/
@@ -248,7 +248,7 @@ Example: `src/hrtech_etl/connectors/my_system/`
    src/hrtech_etl/connectors/my_system/
    ├─ __init__.py
    ├─ models.py
-   ├─ requests.py
+   ├─ actions.py
    └─ test.py
    ```
 
@@ -284,7 +284,7 @@ Example: `src/hrtech_etl/connectors/my_system/`
 
    Same pattern for `MySystemProfile`.
 
-3. **Implement low-level client / requests** (`requests.py`)
+3. **Implement low-level client / actions** (`actions.py`)
 
    * Handle HTTP / DB calls.
    * Provide methods like `read_jobs_batch`, `read_profiles_batch`, possibly `fetch_jobs_by_events`, `fetch_profiles_by_events`.
@@ -299,7 +299,6 @@ Example: `src/hrtech_etl/connectors/my_system/`
      * `to_unified_profile`, `from_unified_profile`
      * `read_resources_batch(...)`
      * `write_resources_batch(...)`
-     * `get_cursor_from_native_resource(...)`
      * `get_resource_id(...)`
      * `parse_resource_event(...)` / `fetch_resources_by_events(...)` if events are supported.
 

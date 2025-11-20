@@ -35,6 +35,7 @@ def pull_cmd(
     target: str = typer.Option(..., help="target connector name"),
     cursor_mode: str = typer.Option("updated_at"),
     cursor_start: str | None = typer.Option(None),
+    cursor_sort_by: str = typer.Option("asc"),
     where: str | None = typer.Option(None, help="JSON list of conditions"),
     having: str | None = typer.Option(None, help="JSON list of conditions"),
     formatter: str | None = typer.Option(None, help="dotted path to formatter"),
@@ -45,7 +46,7 @@ def pull_cmd(
     origin_conn = get_connector_instance(origin)
     target_conn = get_connector_instance(target)
 
-    cur = Cursor(mode=CursorMode(cursor_mode), start=cursor_start, end=None)
+    cur = Cursor(mode=CursorMode(cursor_mode), start=cursor_start, end=None, sort_by=cursor_sort_by)
     where_conds = _parse_conditions(where)
     having_conds = _parse_conditions(having)
 

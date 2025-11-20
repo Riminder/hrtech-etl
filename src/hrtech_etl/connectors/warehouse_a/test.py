@@ -4,11 +4,11 @@ from typing import Any, Dict, List, Optional
 
 from hrtech_etl.core.auth import BaseAuth
 from hrtech_etl.core.pipeline import pull, push
-from hrtech_etl.core.types import Cursor, CursorMode, PushMode, Resource
+from hrtech_etl.core.types import Cursor, CursorMode, PushMode, Resource, Condition
 
 from . import WarehouseAConnector
 from .models import WarehouseAJob, WarehouseAProfile
-from .requests import WarehouseARequests
+from .actions import WarehouseAActions
 
 
 class DummyAuth(BaseAuth):
@@ -16,13 +16,12 @@ class DummyAuth(BaseAuth):
         return headers
 
 
-class DummyRequests(WarehouseARequests):
+class DummyActions(WarehouseAActions):
     def fetch_jobs(
         self,
-        where: Dict[str, Any] | None,
-        cursor_start: Optional[str],
-        cursor_mode: str,
-        limit: int,
+        cursor: Cursor=Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
+        where: list[Condition] | None = None,
+        batch_size: int= 1000,
     ) -> tuple[List[WarehouseAJob], Optional[str]]:
         job = WarehouseAJob(
             job_id="job-1",
@@ -45,13 +44,13 @@ class DummyRequests(WarehouseARequests):
 
 def test_pull_jobs_basic():
     origin = WarehouseAConnector(
-        auth=DummyAuth(), requests=DummyRequests(base_url="", api_key="x")
+        auth=DummyAuth(), actions=DummyActions(base_url="", api_key="x")
     )
     target = WarehouseAConnector(
-        auth=DummyAuth(), requests=DummyRequests(base_url="", api_key="y")
+        auth=DummyAuth(), actions=DummyActions(base_url="", api_key="y")
     )
 
-    cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None)
+    cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc")
     new_cursor = pull(
         resource=Resource.JOB,
         origin=origin,

@@ -1,13 +1,17 @@
 # hrtech_etl/core/connector.py
 from abc import ABC, abstractmethod
-from typing import Any, Iterable, List, Optional, Tuple, Type
+from typing import Any, Iterable, List, Optional, Tuple, Type, Dict
 
 from pydantic import BaseModel
 
 from .auth import BaseAuth
 from .models import UnifiedJob, UnifiedJobEvent, UnifiedProfile, UnifiedProfileEvent
-from .types import Condition, CursorMode, Resource, WarehouseType
-
+from .types import Condition, CursorMode, Resource, WarehouseType, Cursor, Operator
+from .utils import (
+    build_cursor_query_params,
+    build_eq_query_params, 
+    build_search_query_params
+)
 
 class BaseConnector(ABC):
     """
@@ -26,12 +30,14 @@ class BaseConnector(ABC):
         auth: BaseAuth,
         name: str,
         warehouse_type: WarehouseType,
-        requests: BaseModel,
+        actions: BaseModel,
     ):
         self.auth = auth
         self.name = name
         self.warehouse_type = warehouse_type
-        self.requests = requests
+        self.actions = actions
+
+
 
     # --- JOBS PRIMITIVES: READ / WRITE / CURSOR ---
 
@@ -48,9 +54,8 @@ class BaseConnector(ABC):
     @abstractmethod
     def read_jobs_batch(
         self,
-        where: list[Condition] | None,
-        cursor_start: str = None,  # fixme starting cursor
-        cursor_mode: CursorMode = CursorMode.UPDATED_AT,
+        cursor: Cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
+        where: list[Condition] | None = None,
         batch_size: int = 1000,
     ) -> Tuple[List[BaseModel], Optional[str]]:
         """
@@ -85,13 +90,6 @@ class BaseConnector(ABC):
             )
 
     @abstractmethod
-    def get_cursor_from_native_job(
-        self, native_job: BaseModel, cursor_mode: CursorMode
-    ) -> str | None:
-        """Extract cursor value from a native job."""
-        raise NotImplementedError
-
-    @abstractmethod
     def get_job_id(self, native_job: BaseModel) -> str:
         """Extract business job_id from a native job."""
         raise NotImplementedError
@@ -111,9 +109,8 @@ class BaseConnector(ABC):
     @abstractmethod
     def read_profiles_batch(
         self,
-        where: list[Condition] | None,
-        cursor_start: str = None,
-        cursor_mode: CursorMode = CursorMode.UPDATED_AT,
+        cursor: Cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
+        where: list[Condition] | None = None,
         batch_size: int = 1000,
     ) -> Tuple[List[BaseModel], Optional[str]]:
         """
@@ -146,12 +143,6 @@ class BaseConnector(ABC):
                 f"[{self.name}] Unsupported profile type {type(first)} "
                 f"(expected {self.profile_native_cls} or UnifiedProfile)."
             )
-
-    @abstractmethod
-    def get_cursor_from_native_profile(
-        self, native_profile: BaseModel, cursor_mode: CursorMode
-    ) -> str | None:
-        raise NotImplementedError
 
     @abstractmethod
     def get_profile_id(self, native_profile: BaseModel) -> str:
@@ -210,23 +201,20 @@ class BaseConnector(ABC):
     def read_resources_batch(
         self,
         resource: Resource,
-        where: list[Condition] | None,
-        cursor_start: Optional[str],
-        cursor_mode: CursorMode,
-        batch_size: int,
+        cursor: Cursor=Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
+        where: list[Condition] | None = None,
+        batch_size: int=1000,
     ) -> Tuple[List[BaseModel], Optional[str]]:
         if resource == Resource.JOB:
             return self.read_jobs_batch(
+                cursor=cursor,
                 where=where,
-                cursor_start=cursor_start,
-                cursor_mode=cursor_mode,
                 batch_size=batch_size,
             )
         elif resource == Resource.PROFILE:
             return self.read_profiles_batch(
+                cursor=cursor,
                 where=where,
-                cursor_start=cursor_start,
-                cursor_mode=cursor_mode,
                 batch_size=batch_size,
             )
         else:
@@ -241,19 +229,6 @@ class BaseConnector(ABC):
             self.write_jobs_batch(resources)
         elif resource == Resource.PROFILE:
             self.write_profiles_batch(resources)
-        else:
-            raise ValueError(f"Unsupported resource: {resource}")
-
-    def get_cursor_from_native_resource(
-        self,
-        resource: Resource,
-        native_resource: BaseModel,
-        cursor_mode: CursorMode,
-    ) -> Optional[str]:
-        if resource == Resource.JOB:
-            return self.get_cursor_from_native_job(native_resource, cursor_mode)
-        elif resource == Resource.PROFILE:
-            return self.get_cursor_from_native_profile(native_resource, cursor_mode)
         else:
             raise ValueError(f"Unsupported resource: {resource}")
 
@@ -308,3 +283,32 @@ class BaseConnector(ABC):
             raise ValueError(
                 f"Unsupported resource in fetch_resources_by_events: {resource}"
             )
+    
+    # --- WHERE FILTER HELPERS ---
+    @abstractmethod
+    def build_connector_query_params(
+        self,
+        resource: BaseModel,
+        cursor: Cursor=Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
+        where: Optional[List[Condition]]=None,
+        cursor_min_native_name: Optional[str] = None,
+        cursor_max_native_name: Optional[str] = None,
+        sort_by_native_name: Optional[str] = "sort_by",
+        sort_by_native_value: Optional[str] = "asc",
+        batch_size: int = 1000,
+    ) -> Dict[str, Any]:
+        """
+        Build connector-specific query params from generic WHERE conditions + cursor.
+        """
+        cursor_params = build_cursor_query_params(
+            cursor=cursor,
+            resource=resource,
+            cursor_start_native_name=cursor_min_native_name,
+            cursor_end_native_name=cursor_max_native_name,
+            sort_by_native_name=sort_by_native_name,
+            sort_by_native_value=sort_by_native_value,
+        )
+
+        base_params = build_eq_query_params(where)
+        search_params = build_search_query_params(where=where, resource=resource)
+        return {**base_params, **search_params, **cursor_params}  # search params override if same key

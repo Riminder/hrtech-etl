@@ -98,6 +98,13 @@
         <input type="text" name="cursor_start" value="{{ cursor_start or '' }}" />
       </label>
 
+      <label>Cursor sort by:
+        <select name="cursor_sort_by">
+          <option value="asc" {% if cursor_sort_by == "asc" %}selected{% endif %}>asc</option>
+          <option value="desc" {% if cursor_sort_by == "desc" %}selected{% endif %}>desc</option>
+        </select>
+      </label>
+
       {% if cursor_end %}
         &nbsp;&nbsp;
         <span>Last cursor end: <code>{{ cursor_end }}</code></span>

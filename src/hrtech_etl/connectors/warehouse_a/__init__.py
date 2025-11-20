@@ -11,10 +11,14 @@ from hrtech_etl.core.models import (
     UnifiedJob,
     UnifiedJobEvent,
     UnifiedProfile,
-    UnifiedProfileEvent,
+    UnifiedProfileEvent
 )
 from hrtech_etl.core.registry import ConnectorMeta, register_connector
-from hrtech_etl.core.types import Condition, CursorMode, WarehouseType
+from hrtech_etl.core.types import Condition, Cursor, CursorMode, WarehouseType
+from hrtech_etl.core.utils import (
+    get_cursor_native_name,
+    build_eq_query_params, 
+    build_search_query_params)
 
 from .models import (
     WarehouseAJob,
@@ -22,19 +26,19 @@ from .models import (
     WarehouseAProfile,
     WarehouseAProfileEvent,
 )
-from .requests import WarehouseARequests
+from .actions import WarehouseAActions
 
 
 class WarehouseAConnector(BaseConnector):
     job_native_cls = WarehouseAJob
     profile_native_cls = WarehouseAProfile
 
-    def __init__(self, auth: BaseAuth, requests: WarehouseARequests):
+    def __init__(self, auth: BaseAuth, actions: WarehouseAActions):
         super().__init__(
             auth=auth,
             name="warehouse_a",
             warehouse_type=WarehouseType.JOBBOARD,  # ou ATS / CRM / HCM
-            requests=requests,
+            actions=actions,
         )
 
     # -------- JOBS: unified ↔ native --------
@@ -42,7 +46,7 @@ class WarehouseAConnector(BaseConnector):
     def to_unified_job(self, native: BaseModel) -> UnifiedJob:
         assert isinstance(native, WarehouseAJob)
         return UnifiedJob(
-            job_id=native.job_id,
+            job_id=native.id,
             title=native.title,
             created_at=native.created_at,
             updated_at=native.updated_at,
@@ -55,7 +59,7 @@ class WarehouseAConnector(BaseConnector):
 
     def from_unified_job(self, unified: UnifiedJob) -> WarehouseAJob:
         return WarehouseAJob(
-            job_id=unified.job_id,
+            job_id=unified.id,
             title=unified.title or "",
             created_at=unified.created_at or unified.updated_at,
             updated_at=unified.updated_at or unified.created_at,
@@ -65,8 +69,7 @@ class WarehouseAConnector(BaseConnector):
     def read_jobs_batch(
         self,
         where: list[Condition] | None,
-        cursor_start: Optional[str] = None,
-        cursor_mode: CursorMode = CursorMode.UPDATED_AT,
+        cursor: Cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
         batch_size: int = 1000,
     ) -> Tuple[List[BaseModel], Optional[str]]:
         where_payload: Dict[str, Any] | None = None
@@ -79,33 +82,21 @@ class WarehouseAConnector(BaseConnector):
                     where_payload[cond.field] = cond.value
                 # TODO: mapper gte/lte/contains → syntaxe de l’API A
 
-        jobs, next_cursor = self.requests.fetch_jobs(
+        jobs, next_cursor = self.actions.fetch_jobs(
+            cursor=cursor,
             where=where_payload,
-            cursor_start=cursor_start,
-            cursor_mode=cursor_mode.value,
             limit=batch_size,
         )
         return jobs, next_cursor
 
     def _write_jobs_native(self, jobs: List[BaseModel]) -> None:
         assert all(isinstance(j, WarehouseAJob) for j in jobs)
-        self.requests.upsert_jobs(jobs)  # type: ignore[arg-type]
+        self.actions.upsert_jobs(jobs)  # type: ignore[arg-type]
 
-    def get_cursor_from_native_job(
-        self, native_job: BaseModel, cursor_mode: CursorMode
-    ) -> Optional[str]:
-        assert isinstance(native_job, WarehouseAJob)
-        if cursor_mode == CursorMode.ID:
-            return native_job.job_id
-        if cursor_mode == CursorMode.CREATED_AT:
-            return native_job.created_at.isoformat()
-        if cursor_mode == CursorMode.UPDATED_AT:
-            return native_job.updated_at.isoformat()
-        return None
 
     def get_job_id(self, native_job: BaseModel) -> str:
         assert isinstance(native_job, WarehouseAJob)
-        return native_job.job_id
+        return native_job.id
 
     # -------- PROFILES: unified ↔ native --------
 
@@ -125,7 +116,7 @@ class WarehouseAConnector(BaseConnector):
 
     def from_unified_profile(self, unified: UnifiedProfile) -> WarehouseAProfile:
         return WarehouseAProfile(
-            profile_id=unified.profile_id,
+            profile_id=unified.id,
             full_name=unified.full_name or "",
             created_at=unified.created_at or unified.updated_at,
             updated_at=unified.updated_at or unified.created_at,
@@ -135,8 +126,7 @@ class WarehouseAConnector(BaseConnector):
     def read_profiles_batch(
         self,
         where: list[Condition] | None,
-        cursor_start: Optional[str] = None,
-        cursor_mode: CursorMode = CursorMode.UPDATED_AT,
+        cursor: Cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
         batch_size: int = 1000,
     ) -> Tuple[List[BaseModel], Optional[str]]:
         where_payload: Dict[str, Any] | None = None
@@ -147,33 +137,21 @@ class WarehouseAConnector(BaseConnector):
                 if cond.op.value == "eq":
                     where_payload[cond.field] = cond.value
 
-        profiles, next_cursor = self.requests.fetch_profiles(
+        profiles, next_cursor = self.actions.fetch_profiles(
+            cursor=cursor,
             where=where_payload,
-            cursor_start=cursor_start,
-            cursor_mode=cursor_mode.value,
             limit=batch_size,
         )
         return profiles, next_cursor
 
     def _write_profiles_native(self, profiles: List[BaseModel]) -> None:
         assert all(isinstance(p, WarehouseAProfile) for p in profiles)
-        self.requests.upsert_profiles(profiles)  # type: ignore[arg-type]
+        self.actions.upsert_profiles(profiles)  # type: ignore[arg-type]
 
-    def get_cursor_from_native_profile(
-        self, native_profile: BaseModel, cursor_mode: CursorMode
-    ) -> Optional[str]:
-        assert isinstance(native_profile, WarehouseAProfile)
-        if cursor_mode == CursorMode.ID:
-            return native_profile.profile_id
-        if cursor_mode == CursorMode.CREATED_AT:
-            return native_profile.created_at.isoformat()
-        if cursor_mode == CursorMode.UPDATED_AT:
-            return native_profile.updated_at.isoformat()
-        return None
 
     def get_profile_id(self, native_profile: BaseModel) -> str:
         assert isinstance(native_profile, WarehouseAProfile)
-        return native_profile.profile_id
+        return native_profile.id
 
     # -------- EVENTS: JOBS --------
 
@@ -187,7 +165,7 @@ class WarehouseAConnector(BaseConnector):
         self, events: Iterable[UnifiedJobEvent]
     ) -> List[BaseModel]:
         job_ids = [ev.job_id for ev in events]
-        return self.requests.fetch_jobs_by_ids(job_ids)
+        return self.actions.fetch_jobs_by_ids(job_ids)
 
     # -------- EVENTS: PROFILES --------
 
@@ -201,21 +179,42 @@ class WarehouseAConnector(BaseConnector):
         self, events: Iterable[UnifiedProfileEvent]
     ) -> List[BaseModel]:
         profile_ids = [ev.profile_id for ev in events]
-        return self.requests.fetch_profiles_by_ids(profile_ids)
+        return self.actions.fetch_profiles_by_ids(profile_ids)
 
-
+    # --- WHERE FILTER HELPERS ---
+    def build_connector_query_params(
+        self,
+        resource: BaseModel,
+        cursor: Cursor=Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
+        where: Optional[List[Condition]]=None,
+        order_by_name: Optional[str] = "sort_by",
+        order_by_value: Optional[str] = "asc",
+        batch_size: int = 1000,
+    ) -> Dict[str, Any]:
+        """
+        Build connector-specific query params from generic WHERE conditions + cursor.
+        """
+        cursor_name = get_cursor_native_name(resource, cursor.mode)
+        cursor_param = {}
+        if cursor_name and cursor.start is not None:
+            cursor_param = {cursor_name: cursor.start}  
+        sort_param = {order_by_name: order_by_value} if order_by_name else {}
+        base_params = build_eq_query_params(where)
+        search_params = build_search_query_params(where=where, resource=resource)
+        return {**base_params, **search_params, **cursor_param, **sort_param}  # search params override if same key
+    
 # ---------- Factory + Registry registration ----------
 
 
 # Optional: factory to build a default instance with some dummy auth
 def _build_default_connector() -> WarehouseAConnector:
     auth = ApiKeyAuth("X-API-Key", "dummy")
-    # adapte à la signature actuelle de WarehouseARequests
-    requests = WarehouseARequests(
+    # adapte à la signature actuelle de WarehouseAActions
+    actions = WarehouseAActions(
         base_url="https://api.warehouse-a.example",
         api_key="dummy",
     )
-    return WarehouseAConnector(auth=auth, requests=requests)
+    return WarehouseAConnector(auth=auth, actions=actions)
 
 
 # Register for UI / config usage
@@ -237,5 +236,5 @@ __all__ = [
     "WarehouseAProfile",
     "WarehouseAJobEvent",
     "WarehouseAProfileEvent",
-    "WarehouseARequests",
+    "WarehouseAActions",
 ]
