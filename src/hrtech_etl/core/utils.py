@@ -190,45 +190,91 @@ def get_cursor_native_value(resource: BaseModel, cursor_mode: CursorMode) -> Any
 # --- BUILD QUERY PARAMS FROM WHERE HELPERS ---
 
 #fixme update function based on the models.py
+
+
 def build_cursor_query_params(
     cursor: Cursor,
     resource: Union[BaseModel, Type[BaseModel]],
-    cursor_start_native_name: str,
-    cursor_end_native_name: str,
-    sort_by_native_name: str,
-    sort_by_native_value: str=Cursor.sort_by.value,
+    cursor_start_native_name: Optional[str],
+    cursor_end_native_name: Optional[str],
+    sort_by_native_name: Optional[str],
+    sort_by_native_value: str = Cursor.sort_by.value,
 ) -> Dict[str, Any]:
     """
     Build query params for the given cursor on the given resource.
 
+    JSON metadata on the cursor field can define:
+      - cursor_start_min: param name when start is a lower bound (ASC)
+      - cursor_start_max: param name when start is an upper bound (DESC)
+
     Example:
-      - Cursor(mode=CREATED_AT, start="2023-01-01T00:00:00Z")
-      - Resource=WarehouseAJob
+      createdAt: Field(
+          ...,
+          json_schema_extra={
+              "cursor": CursorMode.CREATED_AT.value,
+              "cursor_start_min": "created_at_min",
+              "cursor_start_max": "created_at_max",
+          },
+      )
+
+      Cursor(mode=CREATED_AT, start="2023-01-01T00:00:00Z", sort_by="asc")
       ->
       {
         "created_at_min": "2023-01-01T00:00:00Z"
       }
     """
+
     # Normalize to class
     if isinstance(resource, BaseModel):
         resource_cls = type(resource)
     else:
         resource_cls = resource
 
+    # Find the native cursor field name (e.g. "createdAt")
     cursor_name = get_cursor_native_name(resource_cls, cursor.mode)
     if not cursor_name:
-        # error
         raise ValueError(
             f"No cursor field found for mode {cursor.mode} on resource {resource_cls.__name__}"
         )
-    cursor_params = {}
-    if cursor_name:
-        if cursor_start_native_name is None:
-            cursor_params[cursor_start_native_name] = cursor.start
-        if cursor_end_native_name is None:
-            cursor_params[cursor_end_native_name] = cursor.end
-        if sort_by_native_name:
-            cursor_params[sort_by_native_name] = sort_by_native_value
+
+    # Read extra metadata from that field
+    field = resource_cls.model_fields.get(cursor_name) or getattr(
+        resource_cls, "__fields__", {}
+    ).get(cursor_name)
+
+    extra = getattr(field, "json_schema_extra", None)
+    if not extra and hasattr(field, "field_info"):
+        extra = getattr(field.field_info, "extra", None)
+    extra = extra or {}
+
+    # Prefer json_schema_extra param names, fall back to function args
+    start_min_param = extra.get("cursor_start_min", cursor_start_native_name)
+    start_max_param = extra.get("cursor_start_max", cursor_end_native_name)
+
+    cursor_params: Dict[str, Any] = {}
+
+    # sort_by parameter if any
+    if sort_by_native_name:
+        cursor_params[sort_by_native_name] = sort_by_native_value
+
+    # start bound
+    if cursor.start is not None:
+        sort_dir = (cursor.sort_by or "asc").lower()
+        if sort_dir == "asc" and start_min_param:
+            cursor_params[start_min_param] = cursor.start
+        elif sort_dir == "desc" and start_max_param:
+            cursor_params[start_max_param] = cursor.start
+
+    # end bound (optional, symmetrical logic if you use it)
+    if cursor.end is not None:
+        # you can add cursor_end_min / cursor_end_max in extra
+        end_min_param = extra.get("cursor_end_min", None)
+        end_max_param = extra.get("cursor_end_max", None)
+        sort_dir = (cursor.sort_by or "asc").lower()
+        if sort_dir == "asc" and end_max_param:
+            cursor_params[end_max_param] = cursor.end
+        elif sort_dir == "desc" and end_min_param:
+            cursor_params[end_min_param] = cursor.end
 
     return cursor_params
 

@@ -193,8 +193,8 @@ class UnifiedJob(BaseModel):
         ...,
         json_schema_extra={
             "cursor": CursorMode.CREATED_AT.value,
-            "cursor_start_min": "created_at_min",
-            "cursor_end_max": "created_at_max",
+            "cursor_start_min": "date_range_min",
+            "cursor_end_max": "date_range_max",
             "cursor_order_up": "asc",
             "cursor_order_down": "desc",
             "prefilter": {"operators": ["gte", "lte"]},
@@ -205,8 +205,8 @@ class UnifiedJob(BaseModel):
         ...,
         json_schema_extra={
             "cursor": CursorMode.UPDATED_AT.value,
-            "cursor_start_min": "updated_at_min",
-            "cursor_end_max": "updated_at_max",
+            "cursor_start_min": "date_range_min",
+            "cursor_end_max": "date_range_max",
             "cursor_order_up": "asc",
             "cursor_order_down": "desc",
             "prefilter": {"operators": ["gte", "lte"]},
@@ -458,8 +458,8 @@ class UnifiedProfile(BaseModel):
         ...,
         json_schema_extra={
             "cursor": CursorMode.CREATED_AT.value,
-            "cursor_start_min": "created_at_min",
-            "cursor_end_max": "created_at_max",
+            "cursor_start_min": "date_range_min",
+            "cursor_end_max": "date_range_max",
             "cursor_order_up": "asc",
             "cursor_order_down": "desc",
             "prefilter": {"operators": ["gte", "lte"]},
@@ -470,8 +470,8 @@ class UnifiedProfile(BaseModel):
         ...,
         json_schema_extra={
             "cursor": CursorMode.UPDATED_AT.value,
-            "cursor_start_min": "updated_at_min",
-            "cursor_end_max": "updated_at_max",
+            "cursor_start_min": "date_range_min",
+            "cursor_end_max": "date_range_max",
             "cursor_order_up": "asc",
             "cursor_order_down": "desc",
             "prefilter": {"operators": ["gte", "lte"]},
