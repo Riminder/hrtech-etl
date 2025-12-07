@@ -14,6 +14,7 @@ from hrtech_etl.core.models import (
 )
 from hrtech_etl.core.registry import ConnectorMeta, register_connector
 from hrtech_etl.core.types import Condition, Cursor, CursorMode, WarehouseType
+from hrtech_etl.core.utils import build_connector_params
 
 from .actions import WarehouseHrflowActions
 from .models import (
@@ -40,7 +41,6 @@ class WarehouseHrflowConnector(BaseConnector):
 
     def to_unified_job(self, native: BaseModel) -> UnifiedJob:
         assert isinstance(native, WarehouseHrflowJob)
-        # FIXME: requires core update to align WarehouseHrflowJob <-> UnifiedJob
         return UnifiedJob(
             job_id=native.key,
             title=native.name,
@@ -54,7 +54,6 @@ class WarehouseHrflowConnector(BaseConnector):
         )
 
     def from_unified_job(self, unified: UnifiedJob) -> WarehouseHrflowJob:
-        # FIXME: requires core update to align WarehouseHrflowJob <-> UnifiedJob
         return WarehouseHrflowJob(
             key=unified.job_id,
             reference=unified.job_id,
@@ -70,22 +69,29 @@ class WarehouseHrflowConnector(BaseConnector):
         where: list[Condition] | None = None,
         batch_size: int = 1000,
     ) -> Tuple[List[BaseModel], Optional[str]]:
-        where_payload: Dict[str, Any] | None = None
+        """
+        High-level read for jobs:
 
-        if where:
-            where_payload = {}
-            for cond in where:
-                # Exemple simple : EQ -> égalité
-                if cond.op.value == "eq":
-                    where_payload[cond.field] = cond.value
-                # TODO: mapper gte/lte/contains → syntaxe de l’API A
+          - builds query params (EQ / IN / search / cursor) using WarehouseAJob metadata
+          - delegates actual HTTP call to actions.fetch_jobs(params)
+        """
+        where = where or []
 
-        jobs, next_cursor = self.actions.fetch_jobs(
+        # Unified sort_by is typically the unified cursor field name.
+        # For simplicity, we use cursor.mode.value ("updated_at", "created_at", "uid").
+        sort_by_unified = cursor.mode.value
+
+        params: Dict[str, Any] = build_connector_params(
+            resource_cls=WarehouseHrflowJob,
+            where=where,
             cursor=cursor,
-            where=where_payload,
-            batch_size=batch_size,
+            sort_by_unified=sort_by_unified,
+            sort_param_name=self.sort_param_name,  # "order"
         )
-        return jobs, next_cursor
+        params["limit"] = batch_size
+
+        jobs = self.actions.fetch_jobs(params=params)
+        return self._finalize_read_batch(resources=jobs, cursor=cursor)
 
     def _write_jobs_native(self, jobs: List[BaseModel]) -> None:
         assert all(isinstance(j, WarehouseHrflowJob) for j in jobs)
@@ -128,20 +134,27 @@ class WarehouseHrflowConnector(BaseConnector):
         where: list[Condition] | None = None,
         batch_size: int = 1000,
     ) -> Tuple[List[BaseModel], Optional[str]]:
-        where_payload: Dict[str, Any] | None = None
+        """
+        High-level read for profiles:
 
-        if where:
-            where_payload = {}
-            for cond in where:
-                if cond.op.value == "eq":
-                    where_payload[cond.field] = cond.value
+          - builds query params (EQ / IN / search / cursor) using WarehouseAProfile metadata
+          - delegates to actions.fetch_profiles(params)
+        """
+        where = where or []
 
-        profiles, next_cursor = self.actions.fetch_profiles(
+        sort_by_unified = cursor.mode.value
+
+        params: Dict[str, Any] = build_connector_params(
+            resource_cls=WarehouseHrflowProfile,
+            where=where,
             cursor=cursor,
-            where=where_payload,
-            batch_size=batch_size,
+            sort_by_unified=sort_by_unified,
+            sort_param_name=self.sort_param_name,  # "order"
         )
-        return profiles, next_cursor
+        params["limit"] = batch_size
+
+        profiles = self.actions.fetch_profiles(params=params)
+        return self._finalize_read_batch(resources=profiles, cursor=cursor)
 
     def _write_profiles_native(self, profiles: List[BaseModel]) -> None:
         assert all(isinstance(p, WarehouseHrflowProfile) for p in profiles)
@@ -180,12 +193,6 @@ class WarehouseHrflowConnector(BaseConnector):
         profile_ids = [ev.profile_id for ev in events]
         return self.actions.fetch_profiles_by_ids(profile_ids)
 
-    # --- WHERE FILTER HELPERS ---
-
-    def build_connector_query_params(self, resource, cursor = ..., where = None, cursor_min_native_name = None, 
-                                     cursor_max_native_name = None, sort_by_native_name = "sort_by", sort_by_native_value = "asc", batch_size = 1000):
-        query_params = super().build_connector_query_params(resource, cursor, where, cursor_min_native_name, cursor_max_native_name, sort_by_native_name, sort_by_native_value, batch_size)
-        provider_keys = query_params.get("source_keys", [])
 
 # ---------- Factory + Registry registration ----------
 
