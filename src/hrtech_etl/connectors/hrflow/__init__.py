@@ -90,8 +90,8 @@ class WarehouseHrflowConnector(BaseConnector):
         )
         params["limit"] = batch_size
 
-        jobs, next_cursor = self.actions.fetch_jobs(params=params)
-        return jobs, next_cursor
+        jobs = self.actions.fetch_jobs(params=params)
+        return self._finalize_read_batch(resources=jobs, cursor=cursor)
 
     def _write_jobs_native(self, jobs: List[BaseModel]) -> None:
         assert all(isinstance(j, WarehouseHrflowJob) for j in jobs)
@@ -153,8 +153,8 @@ class WarehouseHrflowConnector(BaseConnector):
         )
         params["limit"] = batch_size
 
-        profiles, next_cursor = self.actions.fetch_profiles(params=params)
-        return profiles, next_cursor
+        profiles = self.actions.fetch_profiles(params=params)
+        return self._finalize_read_batch(resources=profiles, cursor=cursor)
 
     def _write_profiles_native(self, profiles: List[BaseModel]) -> None:
         assert all(isinstance(p, WarehouseHrflowProfile) for p in profiles)
