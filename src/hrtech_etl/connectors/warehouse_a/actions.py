@@ -20,6 +20,7 @@ class WarehouseAActions(BaseModel):
 
     base_url: str
     api_key: str
+    headers: Dict[str, str]
 
     # ------------------------------------------------------------------
     # JOBS
