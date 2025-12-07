@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -10,8 +9,6 @@ from hrtech_etl.connectors.hrflow.models import (
     WarehouseHrflowJob,
     WarehouseHrflowProfile,
 )
-from hrtech_etl.core.types import Cursor, CursorMode
-from hrtech_etl.core.utils import get_cursor_native_value, get_cursor_native_value
 
 
 class WarehouseHrflowActions(BaseModel):
@@ -22,55 +19,18 @@ class WarehouseHrflowActions(BaseModel):
 
     base_url: str
     api_key: str
-    api_user_email: str
-    provider_key: str
+    # FIXME: api_user_email
 
     # --- JOBS ---
 
     def fetch_jobs(
         self,
-        where: Dict[str, Any] | None,
-        cursor: Cursor,
-        batch_size: int,
-    ) -> tuple[List[WarehouseHrflowJob], Optional[str]]:
+        params: Dict[str, Any],
+    ) -> List[WarehouseHrflowJob]:
         """
         Translate `where` + cursor into query params and call Warehouse HrFlow.ai.
         Return (jobs, next_cursor_str_or_none).
         """
-        cursor_start = cursor.start
-        cursor_mode = cursor.mode.value
-        sort_by = cursor.sort_by.value  
-
-        if cursor_mode not in [
-            CursorMode.CREATED_AT.value,
-            CursorMode.UPDATED_AT.value,
-        ]:
-            raise ValueError(f"Unsupported cursor mode: {cursor_mode}")
-
-        # Question: the params here are for storing list,
-        # it needs to be adapted for searching if 'where' integrated.
-        params = {
-            "board_keys": json.dumps([self.provider_key]),
-            "name": None,
-            "key": None,
-            "reference": None,
-            "location_lat": None,
-            "location_lon": None,
-            "location_distance": None,
-            "return_job": True,
-            "page": 1,
-            "limit": batch_size,
-            "order_by": "asc",
-        }
-
-        if cursor_mode == CursorMode.CREATED_AT:
-            params["sort_by"] = "created_at"
-            if cursor_start:
-                params["created_at_min"] = cursor_start
-        else:
-            params["sort_by"] = "updated_at"
-            if cursor_start:
-                params["updated_at_min"] = cursor_start
 
         resp = requests.get(
             f"{self.base_url}/storing/jobs",
@@ -84,11 +44,8 @@ class WarehouseHrflowActions(BaseModel):
         raw_jobs = resp.json().get("data", [])
 
         jobs = [WarehouseHrflowJob(**job, payload=job) for job in raw_jobs]
-        next_cursor = (
-            get_cursor_native_value(jobs[-1], CursorMode(cursor_mode)) if jobs else None
-        )
 
-        return jobs, next_cursor
+        return jobs
 
     def upsert_jobs(self, jobs: List[WarehouseHrflowJob]) -> None:
         """
@@ -146,7 +103,6 @@ class WarehouseHrflowActions(BaseModel):
                     "key": key,
                 },
             )
-            # Question: what if not found?
             if resp.status_code == 200:
                 jobs.append(
                     WarehouseHrflowJob(**resp.json().get("data"), payload=resp.json())
@@ -159,42 +115,11 @@ class WarehouseHrflowActions(BaseModel):
 
     def fetch_profiles(
         self,
-        where: Dict[str, Any] | None,
-        cursor_start: Optional[str],
-        cursor_mode: str,
-        batch_size: int,
-    ) -> tuple[List[WarehouseHrflowProfile], Optional[str]]:
-        if cursor_mode not in [
-            CursorMode.CREATED_AT.value,
-            CursorMode.UPDATED_AT.value,
-        ]:
-            raise ValueError(f"Unsupported cursor mode: {cursor_mode}")
-
-        # Question: the params here are for storing list,
-        # it needs to be adapted for searching if 'where' integrated.
-        params = {
-            "source_keys": json.dumps([self.provider_key]),
-            "name": None,
-            "key": None,
-            "email": None,
-            "reference": None,
-            "location_lat": None,
-            "location_lon": None,
-            "location_distance": None,
-            "return_profile": True,
-            "page": 1,
-            "limit": batch_size,
-            "order_by": "asc",
-        }
-
-        if cursor_mode == CursorMode.CREATED_AT:
-            params["sort_by"] = "created_at"
-            if cursor_start:
-                params["created_at_min"] = cursor_start
-        else:
-            params["sort_by"] = "updated_at"
-            if cursor_start:
-                params["updated_at_min"] = cursor_start
+        params: Dict[str, Any],
+    ) -> List[WarehouseHrflowProfile]:
+        """
+        Execute a GET /profiles (or equivalent) with the given query params.
+        """
 
         resp = requests.get(
             f"{self.base_url}/storing/profiles",
@@ -211,13 +136,7 @@ class WarehouseHrflowActions(BaseModel):
             WarehouseHrflowProfile(**profile, payload=profile)
             for profile in raw_profiles
         ]
-        next_cursor = (
-            get_cursor_native_value(profiles[-1], CursorMode(cursor_mode))
-            if profiles
-            else None
-        )
-
-        return profiles, next_cursor
+        return profiles
 
     def upsert_profiles(self, profiles: List[WarehouseHrflowProfile]) -> None:
         for profile in profiles:

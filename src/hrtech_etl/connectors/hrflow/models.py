@@ -1,29 +1,33 @@
-# src/hrtech_etl/connectors/warehouse_a/models.py
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from hrtech_etl.core.models import UnifiedJob, UnifiedProfile, UnifiedJobEvent, UnifiedProfileEvent
-from hrtech_etl.core.types import Cursor, CursorMode, JobEventType, ProfileEventType
+from hrtech_etl.core.types import JobEventType, ProfileEventType
 
 
-# --- JOBS ---
+
+# ---------------------------------------------------------------------------
+# Native resources for Warehouse HrFlow.ai
+# ---------------------------------------------------------------------------
+
 
 class WarehouseHrflowJob(UnifiedJob):
-    ...  # Existing fields omitted for brevity
+    pass
 
-
-# --- NATIVE PROFILES ---
 
 class WarehouseHrflowProfile(UnifiedProfile):
-    ... # Existing fields omitted for brevity
+    pass
 
-# -------- Native event models (optional but handy) --------
 
-#fixme fix fields according to webhooks
+# ---------------------------------------------------------------------------
+# Native event models (optional but handy for webhook / queue integration)
+# ---------------------------------------------------------------------------
+
+
 class WarehouseHrflowJobEvent(BaseModel):
     """
     Native job event for Warehouse HrFlow.ai.
@@ -33,6 +37,7 @@ class WarehouseHrflowJobEvent(BaseModel):
     - convert to UnifiedJobEvent with `.to_unified()`
     """
 
+    # FIXME: check missing parameters
     event_id: str
     job_id: str
     event_type: str
@@ -74,6 +79,9 @@ class WarehouseHrflowJobEvent(BaseModel):
             return None
 
     def to_unified(self) -> UnifiedJobEvent:
+        """
+        Convert this native event into a UnifiedJobEvent.
+        """
         if self.event_type == "job.created":
             event_type = JobEventType.CREATED
         elif self.event_type == "job.updated":
@@ -83,11 +91,6 @@ class WarehouseHrflowJobEvent(BaseModel):
         else:
             event_type = JobEventType.UPSERTED
 
-        cursor = Cursor(
-            mode=CursorMode.UID,
-            start=self.event_id,
-            end=self.event_id,
-        )
 
         return UnifiedJobEvent(
             event_id=self.event_id,
@@ -96,15 +99,15 @@ class WarehouseHrflowJobEvent(BaseModel):
             occurred_at=self.timestamp,
             payload=self.payload,
             metadata={},
-            cursor=cursor,
         )
 
-#fixme fix fields according to webhooks
+
 class WarehouseHrflowProfileEvent(BaseModel):
     """
     Native profile event for Warehouse HrFlow.ai.
     """
-
+    
+    # FIXME: check missing parameters
     event_id: str
     profile_id: str
     event_type: str
@@ -115,7 +118,18 @@ class WarehouseHrflowProfileEvent(BaseModel):
     def from_payload(
         cls, payload: Dict[str, Any]
     ) -> Optional["WarehouseHrflowProfileEvent"]:
-        # Adjust to actual payload shape
+        """
+        Example mapping – adapt to the actual payload.
+
+        Example:
+
+        {
+          "id": "...",
+          "type": "profile.updated",
+          "timestamp": "...",
+          "data": { "profile": { "id": "...", ... } }
+        }
+        """
         try:
             event_id = payload["id"]
             event_type = payload["type"]
@@ -143,12 +157,6 @@ class WarehouseHrflowProfileEvent(BaseModel):
         else:
             event_type = ProfileEventType.UPSERTED
 
-        cursor = Cursor(
-            mode=CursorMode.UID,
-            start=self.event_id,
-            end=self.event_id,
-        )
-
         return UnifiedProfileEvent(
             event_id=self.event_id,
             profile_id=self.profile_id,
@@ -156,5 +164,4 @@ class WarehouseHrflowProfileEvent(BaseModel):
             occurred_at=self.timestamp,
             payload=self.payload,
             metadata={},
-            cursor=cursor,
         )
