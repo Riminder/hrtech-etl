@@ -1,5 +1,5 @@
 # app/api.py
-from typing import Literal, List, Dict
+from typing import Literal, List, Dict, Optional, Any
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
@@ -11,7 +11,7 @@ from hrtech_etl.core.registry import (
 )
 from hrtech_etl.core.ui_schema import export_model_fields
 from hrtech_etl.core.models import UnifiedJob, UnifiedProfile
-from hrtech_etl.core.types import Resource, PushMode
+from hrtech_etl.core.types import Resource, PushMode, Condition , Cursor
 from hrtech_etl.core.pipeline import (
     pull,
     push,
@@ -21,6 +21,7 @@ from hrtech_etl.core.pipeline import (
     ResourcePushConfig,
 )
 
+from hrtech_etl.core.utils import build_connector_params 
 from hrtech_etl.formatters.base import FORMATTER_REGISTRY, build_mapping_formatter
 
 
@@ -285,3 +286,70 @@ def run_push_with_formatter(body: RunPushWithFormatterRequest):
         dry_run=cfg.dry_run,
     )
     return result.model_dump()
+
+## ---------- DEBUG CONNECTOR PARAMS ----------
+
+class DebugConnectorParamsRequest(BaseModel):
+    connector: str
+    resource: Literal["job", "profile"]
+    cursor: Cursor
+    where: Optional[List[Condition]] = None
+    sort_by_unified: Optional[str] = None  # if None -> use cursor.mode.value
+
+
+class DebugConnectorParamsResponse(BaseModel):
+    connector: str
+    resource: str
+    sort_by_unified: str
+    sort_param_name: Optional[str]
+    params: Dict[str, Any]
+
+
+@router.post("/debug/connector_params", response_model=DebugConnectorParamsResponse)
+def debug_connector_params(body: DebugConnectorParamsRequest):
+    """
+    Debug endpoint:
+      - take a connector name, resource (job/profile),
+        a Cursor and a WHERE (list[Condition])
+      - compute the actual query params sent to the origin connector.
+
+    This lets you visually inspect how:
+      - EQ / IN / CONTAINS
+      - search_binding
+      - in_binding
+      - cursor_* metadata
+
+    are translated into HTTP query parameters.
+    """
+    try:
+        connector = get_connector_instance(body.connector)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Unknown connector")
+
+    # pick native model class
+    if body.resource == "job":
+        resource_cls = connector.job_native_cls
+    else:
+        resource_cls = connector.profile_native_cls
+
+    # if not provided, default to the unified cursor field name
+    sort_by_unified = body.sort_by_unified or body.cursor.mode.value
+
+    # connector may expose sort_param_name (like WarehouseAConnector.sort_param_name = "order")
+    sort_param_name = getattr(connector, "sort_param_name", None)
+
+    params = build_connector_params(
+        resource_cls=resource_cls,
+        where=body.where,
+        cursor=body.cursor,
+        sort_by_unified=sort_by_unified,
+        sort_param_name=sort_param_name,
+    )
+
+    return DebugConnectorParamsResponse(
+        connector=body.connector,
+        resource=body.resource,
+        sort_by_unified=sort_by_unified,
+        sort_param_name=sort_param_name,
+        params=params,
+    )

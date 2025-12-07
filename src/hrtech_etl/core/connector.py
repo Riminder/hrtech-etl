@@ -22,6 +22,8 @@ class BaseConnector(ABC):
     # Native Pydantic models for this warehouse
     job_native_cls: Type[BaseModel]
     profile_native_cls: Type[BaseModel]
+    # nom du param HTTP pour le tri (connecteur-spécifique)
+    sort_param_name: Optional[str] = None  # ex: "order" ou "sort_by"
 
     # --- AUTH / INIT ---
 
@@ -284,31 +286,3 @@ class BaseConnector(ABC):
                 f"Unsupported resource in fetch_resources_by_events: {resource}"
             )
     
-    # --- WHERE FILTER HELPERS ---
-    @abstractmethod
-    def build_connector_query_params(
-        self,
-        resource: BaseModel,
-        cursor: Cursor=Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc"),
-        where: Optional[List[Condition]]=None,
-        cursor_min_native_name: Optional[str] = None,
-        cursor_max_native_name: Optional[str] = None,
-        sort_by_native_name: Optional[str] = "sort_by",
-        sort_by_native_value: Optional[str] = "asc",
-        batch_size: int = 1000,
-    ) -> Dict[str, Any]:
-        """
-        Build connector-specific query params from generic WHERE conditions + cursor.
-        """
-        cursor_params = build_cursor_query_params(
-            cursor=cursor,
-            resource=resource,
-            cursor_start_native_name=cursor_min_native_name,
-            cursor_end_native_name=cursor_max_native_name,
-            sort_by_native_name=sort_by_native_name,
-            sort_by_native_value=sort_by_native_value,
-        )
-
-        base_params = build_eq_query_params(where)
-        search_params = build_search_query_params(where=where, resource=resource)
-        return {**base_params, **search_params, **cursor_params}  # search params override if same key

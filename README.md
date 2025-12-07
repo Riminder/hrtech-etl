@@ -4,22 +4,23 @@
 </div>
 
 <p align="center">
-  <a href="https://pypi.org/project/jobcurator/"><img src="https://img.shields.io/pypi/v/jobcurator.svg" alt="PyPI Version"></a>
-  <a href="https://pypi.org/project/jobcurator/"><img src="https://img.shields.io/pypi/pyversions/jobcurator.svg" alt="Python Versions"></a>
+  <a href="https://pypi.org/project/hrtech-etl/"><img src="https://img.shields.io/pypi/v/hrtech-etl.svg" alt="PyPI Version"></a>
+  <a href="https://pypi.org/project/hrtech-etl/"><img src="https://img.shields.io/pypi/pyversions/hrtech-etl.svg" alt="Python Versions"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License"></a>
 </p>
 
 
 # HrTech ETL (WIP)
 
-Opensource ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM, Jobboard, and HCM** systems.
+Open-source ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM, Jobboard, and HCM** systems.
 
 - Focused on **connectors** (per external warehouse)
 - Uses **Pydantic models** for native & unified objects
 - Supports **cursor-based incremental sync**, **pre-filtering**, **post-filtering**
 - Supports **pull & push pipelines** for **resources** and **events**
 - Uses **pluggable formatters** (Python or mapping-based)
-- Ships with a **FastAPI backend** that can run in **API**, **Playground**, or **both** modes
+- Metadata-driven **query params**: `cursor_*`, `search_binding`, `in_binding`
+- Ships with a **FastAPI backend** (API + Playground) and a **CLI** for scripting
 
 👉 See also: [CONTRIBUTING.md](./CONTRIBUTING.md)
 
@@ -35,18 +36,20 @@ Opensource ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM
    2.4. [Custom Formatters](#24-custom-formatters)  
    2.5. [Prefilters (WHERE) & Postfilters (HAVING)](#25-prefilters-where--postfilters-having)  
    2.6. [JSON / Mapping-based Formatters](#26-json--mapping-based-formatters)  
-3. [FastAPI App: API vs Playground](#fastapi-app-api-vs-playground)  
-4. [Core Concepts](#core-concepts)  
-   4.1. [Resources & Push Modes](#41-resources--push-modes)  
-   4.2. [Connectors & Actions](#42-connectors--actions)  
-   4.3. [Native & Unified Models](#43-native--unified-models)  
-   4.4. [Cursor & Cursor Modes](#44-cursor--cursor-modes)  
-   4.5. [Formatters](#45-formatters)  
-   4.6. [Conditions, Prefilters & UI Schema](#46-conditions-prefilters--ui-schema)  
-5. [Repository Structure](#repository-structure)  
-6. [Roadmap / Status](#roadmap--status)  
-7. [Contributing](#contributing)  
-8. [License](#license)
+3. [CLI Usage](#cli-usage)  
+4. [FastAPI App: API vs Playground](#fastapi-app-api-vs-playground)  
+5. [Core Concepts](#core-concepts)  
+   5.1. [Resources & Push Modes](#51-resources--push-modes)  
+   5.2. [Connectors & Actions](#52-connectors--actions)  
+   5.3. [Native & Unified Models](#53-native--unified-models)  
+   5.4. [Cursor & Cursor Modes](#54-cursor--cursor-modes)  
+   5.5. [Formatters](#55-formatters)  
+   5.6. [Conditions, Prefilters & UI Schema](#56-conditions-prefilters--ui-schema)  
+   5.7. [Query Param Bindings: cursor / search / IN](#57-query-param-bindings-cursor--search--in)  
+6. [Repository Structure](#repository-structure)  
+7. [Roadmap / Status](#roadmap--status)  
+8. [Contributing](#contributing)  
+9. [License](#license)
 
 ---
 
@@ -59,18 +62,23 @@ Opensource ETL framework for **HRTech data** (jobs & profiles) across **ATS, CRM
   - `id`
   - `created_at`
   - `updated_at`
-- 🎛️ **Prefilters** on origin (metadata-driven, via `prefilter` JSON schema on fields)
+- 🎛️ **Prefilters** on origin (metadata-driven, via `prefilter` in `json_schema_extra`)
 - 🎚️ **Postfilters** in core on native origin objects (any field, richer operators)
 - 🧩 **Formatter functions**:
   - explicit native→native (e.g. `WarehouseAJob → WarehouseBJob`)
-  - native→unified→native via connector hooks
+  - implicit native→unified→native via connector hooks
   - JSON-driven mapping formatters (built in the UI)
+- 🧷 **Metadata-driven query params**:
+  - `cursor_start_min` / `cursor_end_max` / `cursor_order_up` / `cursor_order_down`
+  - `search_binding` with `field_join` / `value_join` (e.g. `(title OR text) AND (skills...)`)
+  - `in_binding` for `IN` queries (e.g. `board_key` → `board_keys` as `array`, `csv`, or `array_string`)
 - 📡 **Push pipeline** with two modes:
   - `PushMode.RESOURCES` → push native resources
   - `PushMode.EVENTS` → push from events (`UnifiedJobEvent` / `UnifiedProfileEvent`)
 - 🌐 **FastAPI backend**:
-  - `/api/...` JSON endpoints (connectors, schema, run pull/push, build formatters)
+  - `/api/...` JSON endpoints (connectors, schema, pull/push, formatters)
   - `/playground` HTML UI for no-code mapping + pre/post filters + cursor control + events/resources JSON
+- 🖥 **CLI** for running pull/push jobs from the shell
 
 ---
 
@@ -93,12 +101,12 @@ from hrtech_etl.formatters import a_to_b
 
 origin = WarehouseAConnector(
     auth=ApiKeyAuth("X-API-Key", "AAA"),
-    actions=WarehouseAActions(client_a),
+    actions=WarehouseAActions(base_url="https://api.warehouse-a", api_key="AAA"),
 )
 
 target = WarehouseBConnector(
     auth=BearerAuth("BBB"),
-    actions=WarehouseBActions(client_b),
+    actions=WarehouseBActions(base_url="https://api.warehouse-b", api_key="BBB"),
 )
 
 # start from scratch (no cursor yet)
@@ -110,7 +118,7 @@ cursor_jobs = pull(
     origin=origin,
     target=target,
     cursor=cursor,
-    formatter=a_to_b.format_job,   # JOB formatter
+    formatter=a_to_b.format_job,   # JOB formatter (optional)
     batch_size=5000,
 )
 
@@ -123,14 +131,14 @@ cursor_profiles = pull(
     origin=origin,
     target=target,
     cursor=cursor,
-    formatter=a_to_b.format_profile,  # PROFILE formatter
+    formatter=a_to_b.format_profile,  # PROFILE formatter (optional)
     batch_size=5000,
 )
 
 print("profiles cursor_end:", cursor_profiles.end)
 
 # Store cursor_jobs.end / cursor_profiles.end to resume on next run.
-````
+```
 
 ---
 
@@ -177,7 +185,6 @@ from hrtech_etl.core.pipeline import push
 
 raw_events = read_raw_events_somewhere()
 
-# Connector-specific decoding: raw → UnifiedJobEvent
 events: list[UnifiedJobEvent] = []
 for raw in raw_events:
     ev = origin.parse_resource_event(Resource.JOB, raw)
@@ -204,14 +211,14 @@ print("pushed:", result.total_resources_pushed)
 
 Under the hood for `PushMode.EVENTS`:
 
-1. The connector translates **unified events** → internal fetch actions:
+1. Connector translates unified events → native fetch:
 
-   * `fetch_resources_by_events(Resource.JOB, events)`
-2. Core applies `having` (postfilters) to the **native** jobs.
+   * `origin.fetch_resources_by_events(Resource.JOB, events)`
+2. Core applies `having` (postfilters) to **native** jobs/profiles.
 3. Core uses `safe_format_resources(...)` to:
 
-   * either use your `formatter` directly
-   * or fall back to unified (origin-native → Unified → target-native) if no formatter.
+   * either call your `formatter` directly,
+   * or fallback to **unified** (origin-native → Unified → target-native) if `formatter is None`.
 4. Core calls `target.write_resources_batch(Resource.JOB, formatted_resources)`.
 
 ---
@@ -221,22 +228,25 @@ Under the hood for `PushMode.EVENTS`:
 You can write your own Python formatter for each resource:
 
 ```python
-from hrtech_etl.formatters.base import JobFormatter, ProfileFormatter
 from hrtech_etl.connectors.warehouse_a.models import WarehouseAJob, WarehouseAProfile
 from hrtech_etl.connectors.warehouse_b.models import WarehouseBJob, WarehouseBProfile
 
 def format_job(job: WarehouseAJob) -> WarehouseBJob:
     return WarehouseBJob(
         job_id=job.job_id,
-        title=job.job_title,
-        # ...
+        title=job.title,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        payload=job.payload,
     )
 
 def format_profile(profile: WarehouseAProfile) -> WarehouseBProfile:
     return WarehouseBProfile(
         profile_id=profile.profile_id,
         full_name=profile.full_name,
-        # ...
+        created_at=profile.created_at,
+        updated_at=profile.updated_at,
+        payload=profile.payload,
     )
 
 cursor_jobs = pull(
@@ -248,9 +258,9 @@ cursor_jobs = pull(
 )
 ```
 
-If `formatter` is `None`, the core will automatically:
+If `formatter` is `None`, the core automatically:
 
-* convert origin-native → unified (`to_unified_job` / `to_unified_profile`)
+* converts origin-native → unified (`to_unified_job` / `to_unified_profile`)
 * then unified → target-native (`from_unified_job` / `from_unified_profile`).
 
 ---
@@ -259,19 +269,20 @@ If `formatter` is `None`, the core will automatically:
 
 #### Prefilters (origin WHERE)
 
-Prefilters are pushed down to the origin warehouse via `Prefilter(...)` and metadata on fields (`json_schema_extra["prefilter"]`).
+Prefilters are pushed down to the origin warehouse via `Prefilter(...)` plus field metadata (`json_schema_extra["prefilter"]`).
 
 ```python
+from datetime import datetime
 from hrtech_etl.core.expressions import Prefilter
+from hrtech_etl.core.types import Resource, Cursor, CursorMode
 from hrtech_etl.connectors.warehouse_a.models import WarehouseAJob
-from hrtech_etl.core.types import Cursor, CursorMode, Resource
 
 prefilters = [
-    Prefilter(WarehouseAJob, "job_title").contains("engineer"),
-    Prefilter(WarehouseAJob, "created_on").gte(my_date),
+    Prefilter(WarehouseAJob, "title").contains("engineer"),
+    Prefilter(WarehouseAJob, "created_at").gte(datetime(2024, 1, 1)),
 ]
 
-cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None)
+cursor = Cursor(mode=CursorMode.UPDATED_AT, start=None, sort_by="asc")
 
 cursor_jobs = pull(
     resource=Resource.JOB,
@@ -280,33 +291,40 @@ cursor_jobs = pull(
     cursor=cursor,
     where=prefilters,      # prefilters (optional)
     having=None,
-    formatter=a_to_b.format_job,
+    formatter=None,
 )
 ```
 
-Each `Prefilter(...)` call checks allowed operators for the field from the model’s metadata:
+Example of field metadata:
 
 ```python
-job_title: str = Field(
-    ...,
-    json_schema_extra={
-        "prefilter": {
-            "operators": ["eq", "contains"],
+from pydantic import BaseModel, Field
+
+class WarehouseAJob(BaseModel):
+    title: str = Field(
+        ...,
+        json_schema_extra={
+            "prefilter": {"operators": ["eq", "contains"]},
         },
-    },
-)
+    )
+    created_at: datetime = Field(
+        ...,
+        json_schema_extra={
+            "cursor": "created_at",
+            "prefilter": {"operators": ["gte", "lte"]},
+        },
+    )
 ```
 
 #### Postfilters (origin HAVING)
 
-Postfilters are applied **in memory** on native origin objects (after each batch for pull, before push):
+Postfilters are applied **in memory** on native origin objects:
 
 ```python
 from hrtech_etl.core.types import Condition, Operator
 
 postfilters = [
-    Condition(field="status", op=Operator.EQ, value="open"),
-    Condition(field="location", op=Operator.CONTAINS, value="Remote"),
+    Condition(field="title", op=Operator.CONTAINS, value="Senior"),
 ]
 
 cursor_jobs = pull(
@@ -316,28 +334,28 @@ cursor_jobs = pull(
     cursor=cursor,
     where=prefilters or None,
     having=postfilters or None,
-    formatter=a_to_b.format_job,
+    formatter=None,
 )
 ```
 
 For postfilters:
 
 * All fields are eligible.
-* All operators are allowed (`EQ`, `GT`, `GTE`, `LT`, `LTE`, `IN`, `CONTAINS`).
-* No field-level metadata required.
+* All operators are available (`EQ`, `GT`, `GTE`, `LT`, `LTE`, `IN`, `CONTAINS`).
+* No extra metadata required.
 
 ---
 
 ### 2.6. JSON / Mapping-based Formatters
 
-You can build a formatter from a **mapping spec**. This is useful for the no-code UI.
+You can build a formatter from a **mapping spec**. This is what the UI uses behind the scenes.
 
 ```python
 from hrtech_etl.formatters.base import build_mapping_formatter
 
 mapping = [
-    {"from": "job_title", "to": "title"},
-    {"from": "location", "to": "city"},
+    {"from": "job_id", "to": "id"},
+    {"from": "title",  "to": "name"},
 ]
 
 formatter = build_mapping_formatter(mapping)
@@ -363,23 +381,55 @@ def formatter(origin_obj) -> dict:
     return data
 ```
 
-In the **API** layer, you can store mapping specs by `formatter_id`:
+In the API layer, we store mapping specs in `FORMATTER_REGISTRY` with a `formatter_id`, and rebuild the formatter at runtime.
 
-```python
-from hrtech_etl.formatters.base import FORMATTER_REGISTRY, build_mapping_formatter
+---
 
-def run_pull_with_formatter_id(origin, target, resource, cursor, formatter_id: str):
-    info = FORMATTER_REGISTRY[formatter_id]
-    mapping = info["mapping"]
-    formatter = build_mapping_formatter(mapping)
-    return pull(
-        resource=resource,
-        origin=origin,
-        target=target,
-        cursor=cursor,
-        formatter=formatter,
-    )
+## CLI Usage
+
+The CLI lives in `hrtech_etl/cli.py` and exposes commands like `pull-cmd`.
+
+Typical usage (from the project root):
+
+```bash
+python -m hrtech_etl.cli pull-cmd \
+  --resource job \
+  --origin warehouse_a \
+  --target warehouse_b \
+  --cursor-mode updated_at \
+  --cursor-start "2024-01-01T00:00:00Z" \
+  --cursor-sort-by asc \
+  --batch-size 1000 \
+  --dry-run True
 ```
+
+You can also pass **WHERE** and **HAVING** as JSON lists of conditions:
+
+```bash
+python -m hrtech_etl.cli pull-cmd \
+  --resource job \
+  --origin warehouse_a \
+  --target warehouse_b \
+  --cursor-mode updated_at \
+  --cursor-start "2024-01-01T00:00:00Z" \
+  --cursor-sort-by asc \
+  --where '[
+    {"field": "board_key", "op": "in",       "value": ["board-1", "board-2"]},
+    {"field": "name",      "op": "contains", "value": "engineer"}
+  ]' \
+  --having '[
+    {"field": "updated_at", "op": "gte", "value": "2024-02-01T00:00:00Z"}
+  ]' \
+  --batch-size 1000 \
+  --dry-run True
+```
+
+Internally:
+
+* `_parse_conditions(...)` converts each JSON object into a `Condition`.
+* `pull(...)` receives `where` and `having` exactly like the Python API.
+
+Once packaged, you can expose this as an entry-point (`hrtech-etl pull-cmd ...`) via `pyproject.toml` if you want.
 
 ---
 
@@ -441,14 +491,17 @@ HRTECH_ETL_MODE=both uvicorn app.main:app --reload
 * `GET /api/schema/unified/{resource}`
   → unified model fields (job/profile)
 
-* `POST /api/run/pull` with `ResourcePullConfig`
-  → run `pull(...)` with JSON config
+* `POST /api/run/pull`
+  → run a pull with `ResourcePullConfig`
 
-* `POST /api/run/push` with `ResourcePushConfig`
-  → run `push(...)` with JSON config
+* `POST /api/run/push`
+  → run a push with `ResourcePushConfig`
 
 * `POST /api/formatters/build`
   → store a mapping spec and return a `formatter_id`
+
+* `POST /api/run/pull_with_formatter` / `POST /api/run/push_with_formatter`
+  → same as above, but using a stored `formatter_id`.
 
 ### Playground Highlights
 
@@ -459,9 +512,9 @@ HRTECH_ETL_MODE=both uvicorn app.main:app --reload
 * Select operation (`pull`, `push`)
 * For `pull`:
 
-  * set cursor mode & cursor start
-  * configure mapping (origin→target fields)
-  * set prefilters (origin WHERE) and postfilters (HAVING)
+  * set cursor mode & cursor start / direction
+  * configure mapping (origin→target)
+  * set prefilters (WHERE) and postfilters (HAVING)
 * For `push`:
 
   * choose `PushMode.RESOURCES` or `PushMode.EVENTS`
@@ -472,7 +525,7 @@ HRTECH_ETL_MODE=both uvicorn app.main:app --reload
 
 ## Core Concepts
 
-### 4.1. Resources & Push Modes
+### 5.1. Resources & Push Modes
 
 In `core/types.py`:
 
@@ -489,7 +542,7 @@ All pull/push operations are parameterized by `resource`.
 
 ---
 
-### 4.2. Connectors & Actions
+### 5.2. Connectors & Actions
 
 * **BaseConnector** (`core/connector.py`):
 
@@ -499,7 +552,7 @@ All pull/push operations are parameterized by `resource`.
     * `profile_native_cls`
   * Implements generic resource methods:
 
-    * `read_resources_batch(resource, where, cursor, batch_size)`
+    * `read_resources_batch(resource, cursor, where, batch_size)`
     * `write_resources_batch(resource, resources)`
     * `get_resource_id(resource, native)`
     * `parse_resource_event(resource, raw)`
@@ -508,21 +561,28 @@ All pull/push operations are parameterized by `resource`.
 * **Per-warehouse connectors** (`connectors/warehouse_a`, `connectors/warehouse_b`, ...):
 
   * Implement `BaseConnector` for their system.
-  * Use a `Actions` class (e.g. `WarehouseAActions`) to actually call HTTP / DB.
+  * Use an `Actions` class (e.g. `WarehouseAActions`) to perform concrete HTTP / DB / SDK calls.
+  * Use `build_connector_params(...)` to translate **unified Conditions + Cursor** into backend query params based on model metadata.
 
 ---
 
-### 4.3. Native & Unified Models
+### 5.3. Native & Unified Models
 
-* Native models: e.g. `WarehouseAJob`, `WarehouseAProfile`:
+* Native models: e.g. `WarehouseAJob`, `WarehouseAProfile`
 
-  * Pydantic models with connector-specific fields
-  * Use `json_schema_extra` to annotate cursor and prefilter metadata
+  * Pydantic models with connector-specific fields.
+  * Use `json_schema_extra` to annotate:
+
+    * cursor metadata
+    * prefilter operators
+    * search binding
+    * IN binding
+
 * Unified models (`core/models.py`):
 
   * `UnifiedJob`, `UnifiedProfile`
   * `UnifiedJobEvent`, `UnifiedProfileEvent`
-  * Provide a standard layer to use when `formatter` is `None`.
+  * Provide a standardized layer when no explicit formatter is provided.
 
 Connectors implement:
 
@@ -531,13 +591,13 @@ Connectors implement:
 
 ---
 
-### 4.4. Cursor & Cursor Modes
+### 5.4. Cursor & Cursor Modes
 
 `Cursor` and `CursorMode` (in `core/types.py`):
 
 ```python
-class CursorMode(Enum):
-    ID = "id"
+class CursorMode(str, Enum):
+    UID = "id"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
 
@@ -545,76 +605,179 @@ class Cursor(BaseModel):
     mode: CursorMode
     start: str | None = None
     end: str | None = None
+    sort_by: str = "asc"  # "asc" | "desc"
 ```
 
-Connectors annotate cursor candidates on fields:
+Unified models and native models declare cursor fields via `json_schema_extra`:
 
 ```python
 from pydantic import BaseModel, Field
+from hrtech_etl.core.types import CursorMode
 
-class WarehouseAJob(BaseModel):
-    job_id: str = Field(
+class UnifiedJob(BaseModel):
+    created_at: Optional[str] = Field(
         ...,
-        json_schema_extra={"cursor": ["id"]},
-    )
-    updated_at: datetime = Field(
-        ...,
-        json_schema_extra={"cursor": ["updated_at"], "prefilter": {"operators": ["gte", "lte"]}},
-    )
-    created_at: datetime = Field(
-        ...,
-        json_schema_extra={"cursor": ["created_at"]},
+        json_schema_extra={
+            "cursor": CursorMode.CREATED_AT.value,
+            "cursor_start_min": "date_range_min",
+            "cursor_end_max": "date_range_max",
+            "cursor_order_up": "asc",
+            "cursor_order_down": "desc",
+            "prefilter": {"operators": ["gte", "lte"]},
+        },
     )
 ```
 
-Core uses `get_cursor_native_value(...), get_cursor_native_value` to extract the right name and value based on `CursorMode`.
+`build_cursor_query_params(...)` in `core/utils.py` reads those metadata and builds:
+
+* the correct param names for ranges (`date_range_min`, `date_range_max` or fallbacks)
+* consistent handling of `asc` / `desc` across `start` and `end`.
 
 ---
 
-### 4.5. Formatters
+### 5.5. Formatters
 
 In `formatters/base.py`:
 
 * `JobFormatter` / `ProfileFormatter` Protocols
-* `build_mapping_formatter(mapping)`:
+* `build_mapping_formatter(mapping)` to build a dict-based formatter
+* `FORMATTER_REGISTRY` to store mapping specs in memory for the API & Playground
 
-  * mapping: `[{ "from": "...", "to": "..." }, ...]`
-  * returns a callable that builds a `dict` from an origin object
-* `FORMATTER_REGISTRY`: global in-memory store for formatter configs (for API/Playground)
+Core uses a single helper:
 
-If `formatter` is passed to `pull`/`push`:
+```python
+safe_format_resources(
+    resource,
+    origin,
+    target,
+    formatter,
+    native_resources,
+)
+```
 
-* It is applied per native resource:
+Behavior:
 
-  ```python
-  def safe_format_resources(resource, origin, target, formatter, native_resources) -> list[BaseModel]:
-      if formatter is not None:
-          return [formatter(r) for r in native_resources]
-      # else unified path...
-  ```
+* If `formatter` is provided:
 
-If no formatter is passed:
+  * For each native resource, call `formatter(...)`.
+  * If it returns:
 
-* `safe_format_resources(...)` uses unified path: origin-native → Unified → target-native.
+    * a `BaseModel` → used as is.
+    * a `dict` → wrapped into the target native model.
+* If `formatter` is `None`:
+
+  * Fallback path: origin-native → unified → target-native.
 
 ---
 
-### 4.6. Conditions, Prefilters & UI Schema
+### 5.6. Conditions, Prefilters & UI Schema
 
 * `Condition` / `Operator` (in `core/types.py`) model filter expressions.
-* `Prefilter(model_cls, field_name)` (in `core/expressions.py`) builds a **ConditionBuilder**:
+* `Prefilter` (in `core/expressions.py`) builds metadata-aware prefilters on a given model.
+* `export_model_fields(model_cls, only_prefilterable)` (in `core/ui_schema.py`) exposes:
 
-  * fully aware of allowed operators from field metadata.
-* `export_model_fields(model_cls, only_prefilterable: bool)` (in `core/ui_schema.py`) exposes:
+  * `name`: field name
+  * `type`: Python type name
+  * `cursor`: cursor tag (if any)
+  * `prefilter`: config (`operators`, etc.)
 
-  * field name
-  * type
-  * `cursor` metadata
-  * `prefilter` metadata (operators)
-* These are used by:
+This is used by:
 
-  * the API (`/api/schema/...`)
-  * the Playground UI (to build dropdowns).
+* the API (`/api/schema/...`)
+* the Playground UI to populate dropdowns.
+
+---
+
+### 5.7. Query Param Bindings: cursor / search / IN
+
+The generic query param builder lives in `core/utils.py`:
+
+```python
+build_connector_params(
+    resource_cls: Type[BaseModel],
+    where: Optional[List[Condition]],
+    cursor: Optional[Cursor],
+    *,
+    sort_by_unified: Optional[str],
+    sort_param_name: Optional[str],
+) -> Dict[str, Any]
+```
+
+Under the hood it orchestrates:
+
+* `build_eq_query_params(...)`
+* `build_in_query_params(...)`
+* `build_search_query_params(...)`
+* `build_cursor_query_params(...)`
+
+#### IN Binding (`in_binding`)
+
+In models:
+
+```python
+board_key: str = Field(
+    ...,
+    json_schema_extra={
+        "prefilter": {"operators": ["in"]},
+        "in_binding": {
+            "query_field": "board_keys",   # HTTP query name
+            "formatter": "string_array",   # "array" | "csv" | "array_string"
+        },
+    },
+)
+```
+
+If `query_field` is omitted, default is `field__in`.
+If `formatter` is omitted, default is `array` (Python list).
+
+`build_in_query_params(...)` handles grouping and formatting.
+
+#### Search Binding (`search_binding`)
+
+In unified models:
+
+```python
+from hrtech_etl.core.types import BoolJoin
+
+name: str = Field(
+    ...,
+    json_schema_extra={
+        "prefilter": {"operators": ["contains"]},
+        "search_binding": {
+            "search_field": "keywords",
+            "field_join": BoolJoin.OR,    # how this field joins other fields
+            "value_join": BoolJoin.AND,   # how multiple values on this field are joined
+        },
+    },
+)
+
+text: str = Field(
+    ...,
+    json_schema_extra={
+        "search_binding": {
+            "search_field": "keywords",
+            "field_join": BoolJoin.AND,
+            "value_join": BoolJoin.OR,
+        },
+    },
+)
+```
+
+Given `WHERE` conditions like:
+
+* `name CONTAINS "data"`
+* `text CONTAINS "science"`
+* `skills CONTAINS ["python", "sql"]` (with its own binding)
+
+`build_search_query_params(...)` will produce something like:
+
+```python
+{
+  "keywords": "(data) AND (science) AND (python OR sql)"
+}
+```
+
+depending on `field_join` / `value_join` per field.
 
 ---
 
@@ -625,6 +788,8 @@ hrtech-etl/
 ├─ pyproject.toml
 ├─ README.md
 ├─ CONTRIBUTING.md
+├─ LICENSE
+├─ cli.py                      # CLI entrypoint (pull_cmd, push_cmd using core.pipeline)
 │
 ├─ src/
 │  └─ hrtech_etl/
@@ -632,42 +797,64 @@ hrtech-etl/
 │     │
 │     ├─ core/
 │     │  ├─ __init__.py
-│     │  ├─ auth.py          # BaseAuth, ApiKeyAuth, TokenAuth, BearerAuth
-│     │  ├─ types.py         # Resource, WarehouseType, Cursor, CursorMode, Condition, Operator, PushMode, PushResult, Formatter, ...
-│     │  ├─ models.py        # UnifiedJob, UnifiedProfile, UnifiedJobEvent, UnifiedProfileEvent
-│     │  ├─ connector.py     # BaseConnector (generic for jobs/profiles/events)
-│     │  ├─ expressions.py   # Prefilter(...) → ConditionBuilder
-│     │  ├─ ui_schema.py     # export_model_fields(...) (fields + cursor/prefilter meta)
-│     │  ├─ utils.py         # safe_format_resources, apply_postfilters, helper functions
-│     │  ├─ registry.py      # ConnectorMeta, register_connector, get_connector_instance
-│     │  └─ pipeline.py      # pull(...), push(...), config runners
+│     │  ├─ auth.py            # BaseAuth, ApiKeyAuth, BearerAuth, ...
+│     │  ├─ types.py           # Resource, WarehouseType, Cursor, CursorMode, Condition, Operator,
+│     │  │                     # PushMode, PushResult, BoolJoin, Formatter, ...
+│     │  ├─ models.py          # UnifiedJob, UnifiedProfile, UnifiedJobEvent, UnifiedProfileEvent
+│     │  │                     # + metadata: prefilter, search_binding, in_binding, cursor_*
+│     │  ├─ connector.py       # BaseConnector (generic jobs/profiles/events abstraction)
+│     │  ├─ expressions.py     # Prefilter(...) → metadata-aware Condition builders
+│     │  ├─ ui_schema.py       # export_model_fields(...) for UI (cursor + prefilter metadata)
+│     │  ├─ utils.py           # safe_format_resources, apply_postfilters,
+│     │  │                     # get_cursor_native_name/value, build_eq_query_params,
+│     │  │                     # build_in_query_params, build_search_query_params,
+│     │  │                     # build_cursor_query_params, build_connector_params
+│     │  ├─ registry.py        # ConnectorMeta, register_connector, get_connector_instance
+│     │  └─ pipeline.py        # pull(...), push(...), ResourcePullConfig, ResourcePushConfig,
+│     │                        # run_resource_pull_from_config(...), run_resource_push_from_config(...)
 │     │
 │     ├─ connectors/
 │     │  ├─ __init__.py
 │     │  ├─ warehouse_a/
-│     │  │  ├─ __init__.py   # WarehouseAConnector + registration
-│     │  │  ├─ models.py     # WarehouseAJob, WarehouseAProfile
-│     │  │  ├─ actions.py   # WarehouseAActions (HTTP/DB client)
-│     │  │  └─ test.py       # connector tests
+│     │  │  ├─ __init__.py     # WarehouseAConnector implementation + registration via ConnectorMeta
+│     │  │  ├─ models.py       # WarehouseAJob, WarehouseAProfile, WarehouseAJobEvent, WarehouseAProfileEvent
+│     │  │  ├─ actions.py      # WarehouseAActions (low-level HTTP/DB/SDK client using build_connector_params)
+│     │  │  └─ test.py         # Merged tests:
+│     │  │                     #  - direct pull(...) with DummyActions
+│     │  │                     #  - FastAPI integration tests via TestClient (api.run_pull / api.run_push)
 │     │  └─ warehouse_b/
-│     │     ├─ __init__.py
-│     │     ├─ models.py
-│     │     ├─ actions.py
-│     │     └─ test.py
+│     │     ├─ __init__.py     # (placeholder / example connector)
+│     │     ├─ models.py       # (placeholder native models)
+│     │     ├─ actions.py      # (placeholder actions client)
+│     │     └─ test.py         # (optional example tests or left minimal)
 │     │
 │     └─ formatters/
 │        ├─ __init__.py
-│        ├─ base.py          # FORMATTER_REGISTRY, Protocols, build_mapping_formatter
-│        └─ a_to_b.py        # example: WarehouseA → WarehouseB
+│        ├─ base.py            # FORMATTER_REGISTRY, JobFormatter/ProfileFormatter Protocols,
+│        │                     # build_mapping_formatter(mapping) for mapping-based formatters
+│        └─ a_to_b.py          # Example formatter: WarehouseA → WarehouseB (job/profile mapping)
 │
 ├─ app/
 │  ├─ __init__.py
-│  ├─ api.py                 # JSON API routes
-│  ├─ playground.py          # HTML playground routes
-│  └─ main.py                # create_app() with HRTECH_ETL_MODE switch
+│  ├─ api.py                   # JSON API routes:
+│  │                           #  - /api/connectors
+│  │                           #  - /api/schema/{connector}/{resource}
+│  │                           #  - /api/schema/unified/{resource}
+│  │                           #  - /api/run/pull
+│  │                           #  - /api/run/push
+│  │                           #  - /api/formatters/build, /api/formatters/{id},
+│  │                           #  - /api/run/pull_with_formatter, /api/run/push_with_formatter
+│  ├─ playground.py            # HTML playground:
+│  │                           #  - configure origin/target, resource, cursor
+│  │                           #  - build mapping, prefilters (WHERE), postfilters (HAVING)
+│  │                           #  - push RESOURCES / EVENTS via pasted JSON
+│  ├─ main.py                  # create_app() using HRTECH_ETL_MODE = api | playground | both
+│  └─ templates/
+│     └─ playground.html       # Jinja2 template powering the playground UI
 │
 └─ tests/
-   └─ test.py                # core tests (pipeline, utils, etc.)
+   └─ (empty for now)          # Reserved for future core / integration tests
+                               # Connector-specific tests live close to connectors
 ```
 
 ---
@@ -678,16 +865,13 @@ hrtech-etl/
 
 Planned / in-progress:
 
-* [ ] DevOps v1: local integration environment (Poetry)
-* [ ] DevOps v2: GitHub workflow + package release bumping through PSR
-* [ ] Add real-world ATS/CRM/Jobboard/HCM connectors
-* [ ] Improve type coercion for filters (dates, ints, enums)
-* [ ] Persist formatters and configs (instead of in-memory `FORMATTER_REGISTRY`)
-* [ ] Add worker-style pull pipeline and event hook for push in the playground
-* [ ] Add more warehouse templates and examples
-* [ ] Integrate with Pydantic AI Gateway
+* [ ] DevOps v1: local integration environment (Poetry / uv)
+* [ ] DevOps v2: GitHub workflow + package release bumping through PR
+* [ ] Real-world ATS / CRM / Jobboard / HCM connectors
+* [ ] Better type coercion for filters (dates, ints, enums)
+* [ ] Worker-style pull pipeline + event hooks for push
 * [ ] Add MCP / Agent integrations
-* [ ] Expand test coverage & CI
+* [ ] Expand test coverage & CI (lint, type-check, e2e scenarios)
 
 ---
 
@@ -695,9 +879,10 @@ Planned / in-progress:
 
 Contributions are very welcome ❤️
 
-* To add a new connector (ATS/CRM/Jobboard/HCM)
-* To extend the playground
-* To add new filter operators or cursor strategies
+* Add a new connector (ATS / CRM / Jobboard / HCM)
+* Extend the playground
+* Add new filter operators or cursor strategies
+* Improve docs and examples
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for:
 
@@ -714,4 +899,3 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for:
 
 Distributed under the **MIT License**. See [LICENSE](./LICENSE) for details.
 
----

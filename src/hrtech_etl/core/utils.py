@@ -2,6 +2,8 @@
 from functools import wraps
 from typing import Any, Dict, Iterable, List, Optional, Type, Union, Callable
 
+import json
+
 from pydantic import BaseModel
 
 from .connector import BaseConnector
@@ -190,93 +192,99 @@ def get_cursor_native_value(resource: BaseModel, cursor_mode: CursorMode) -> Any
 # --- BUILD QUERY PARAMS FROM WHERE HELPERS ---
 
 #fixme update function based on the models.py
-
-
 def build_cursor_query_params(
     cursor: Cursor,
     resource: Union[BaseModel, Type[BaseModel]],
-    cursor_start_native_name: Optional[str],
-    cursor_end_native_name: Optional[str],
     sort_by_native_name: Optional[str],
-    sort_by_native_value: str = Cursor.sort_by.value,
+    sort_by_native_value: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Build query params for the given cursor on the given resource.
+    Construit les query params de pagination/cursor à partir :
 
-    JSON metadata on the cursor field can define:
-      - cursor_start_min: param name when start is a lower bound (ASC)
-      - cursor_start_max: param name when start is an upper bound (DESC)
+      - du Cursor (mode, start, end, sort_by)
+      - des metadata du champ cursor dans le modèle :
 
-    Example:
-      createdAt: Field(
-          ...,
-          json_schema_extra={
-              "cursor": CursorMode.CREATED_AT.value,
-              "cursor_start_min": "created_at_min",
-              "cursor_start_max": "created_at_max",
-          },
-      )
+        "cursor": CursorMode.CREATED_AT.value,
+        "cursor_start_min": "date_range_min",
+        "cursor_end_max": "date_range_max",
+        "cursor_order_up": "asc",
+        "cursor_order_down": "desc"
 
-      Cursor(mode=CREATED_AT, start="2023-01-01T00:00:00Z", sort_by="asc")
-      ->
-      {
-        "created_at_min": "2023-01-01T00:00:00Z"
-      }
+    ⚠️ Aucun fallback {field}_gte / {field}_lte :
+       - si `cursor_start_min` ou `cursor_end_max` manquent et qu'on veut
+         utiliser start/end, on lève une ValueError.
     """
+    # Normaliser en classe
+    resource_cls = type(resource) if isinstance(resource, BaseModel) else resource
 
-    # Normalize to class
-    if isinstance(resource, BaseModel):
-        resource_cls = type(resource)
-    else:
-        resource_cls = resource
-
-    # Find the native cursor field name (e.g. "createdAt")
-    cursor_name = get_cursor_native_name(resource_cls, cursor.mode)
-    if not cursor_name:
+    # 1) Trouver le champ natif qui porte le tag "cursor"
+    cursor_field_name = get_cursor_native_name(resource_cls, cursor.mode)
+    if not cursor_field_name:
         raise ValueError(
             f"No cursor field found for mode {cursor.mode} on resource {resource_cls.__name__}"
         )
 
-    # Read extra metadata from that field
-    field = resource_cls.model_fields.get(cursor_name) or getattr(
+    # 2) Récupérer les metadata sur ce champ
+    field = resource_cls.model_fields.get(cursor_field_name) or getattr(
         resource_cls, "__fields__", {}
-    ).get(cursor_name)
+    ).get(cursor_field_name)
 
     extra = getattr(field, "json_schema_extra", None)
-    if not extra and hasattr(field, "field_info"):
+    if not extra and hasattr(field, "field_info"):  # compat pydantic v1
         extra = getattr(field.field_info, "extra", None)
     extra = extra or {}
 
-    # Prefer json_schema_extra param names, fall back to function args
-    start_min_param = extra.get("cursor_start_min", cursor_start_native_name)
-    start_max_param = extra.get("cursor_start_max", cursor_end_native_name)
+    start_min_param = extra.get("cursor_start_min")
+    end_max_param = extra.get("cursor_end_max")
 
-    cursor_params: Dict[str, Any] = {}
+    # Si on veut utiliser un cursor (start ou end), ces deux clés doivent exister
+    if (cursor.start is not None or cursor.end is not None) and (
+        not start_min_param or not end_max_param
+    ):
+        raise ValueError(
+            f"Missing 'cursor_start_min' or 'cursor_end_max' in json_schema_extra "
+            f"for cursor field '{cursor_field_name}' on {resource_cls.__name__}"
+        )
 
-    # sort_by parameter if any
-    if sort_by_native_name:
-        cursor_params[sort_by_native_name] = sort_by_native_value
+    # Valeurs de direction officielles pour ce backend
+    order_up = str(extra.get("cursor_order_up", "asc")).lower()
+    order_down = str(extra.get("cursor_order_down", "desc")).lower()
 
-    # start bound
+    params: Dict[str, Any] = {}
+
+    # 3) Paramètre de tri (facultatif)
+    if sort_by_native_name and sort_by_native_value is not None:
+        params[sort_by_native_name] = sort_by_native_value
+
+    # 4) Appliquer le cursor.start / cursor.end
+    sort_dir = str(getattr(cursor, "sort_by", order_up) or order_up).lower()
+
+    # start
     if cursor.start is not None:
-        sort_dir = (cursor.sort_by or "asc").lower()
-        if sort_dir == "asc" and start_min_param:
-            cursor_params[start_min_param] = cursor.start
-        elif sort_dir == "desc" and start_max_param:
-            cursor_params[start_max_param] = cursor.start
+        if sort_dir == order_up:
+            params[start_min_param] = cursor.start
+        elif sort_dir == order_down:
+            params[end_max_param] = cursor.start
+        else:
+            raise ValueError(
+                f"Unknown cursor.sort_by direction '{cursor.sort_by}', "
+                f"expected '{order_up}' or '{order_down}'"
+            )
 
-    # end bound (optional, symmetrical logic if you use it)
+    # end
     if cursor.end is not None:
-        # you can add cursor_end_min / cursor_end_max in extra
-        end_min_param = extra.get("cursor_end_min", None)
-        end_max_param = extra.get("cursor_end_max", None)
-        sort_dir = (cursor.sort_by or "asc").lower()
-        if sort_dir == "asc" and end_max_param:
-            cursor_params[end_max_param] = cursor.end
-        elif sort_dir == "desc" and end_min_param:
-            cursor_params[end_min_param] = cursor.end
+        if sort_dir == order_up:
+            params[end_max_param] = cursor.end
+        elif sort_dir == order_down:
+            params[start_min_param] = cursor.end
+        else:
+            raise ValueError(
+                f"Unknown cursor.sort_by direction '{cursor.sort_by}', "
+                f"expected '{order_up}' or '{order_down}'"
+            )
 
-    return cursor_params
+    return params
+
 
 
 
@@ -345,46 +353,38 @@ def _normalize_values_as_list(value: Any) -> List[str]:
 
 def build_search_query_params(
     where: Optional[List[Condition]] = None,
-    resource: Union[BaseModel, Type[BaseModel]]=None,
+    resource: Union[BaseModel, Type[BaseModel]] = None,
 ) -> Dict[str, Any]:
     """
     Aggregate CONTAINS conditions mapped via `search_binding`
     into one or more search field query params.
 
-    Behavior:
-      - Automatically detects all `search_field` values from the resource's
-        `json_schema_extra["search_binding"]`.
-      - For each search_field, combines expressions using:
-          * bool_join: how this field joins with other fields
-          * items_join: how multiple values within the field are joined
+    Expected metadata on fields (json_schema_extra["search_binding"]):
 
-    Example configuration:
-      - name:    search_field="keywords", bool_join="or"
-      - summary: search_field="keywords", bool_join="or"
-      - skills:  search_field="keywords", bool_join="and" items_join="and"
-      - tags:    search_field="tags",     bool_join="and"
+      - "search_field": str
+            Name of the query param (e.g. "keywords").
 
-    Conditions:
-      name   CONTAINS "data"
-      summary CONTAINS "science"
-      skills  CONTAINS ["python", "sql"]
-      tags    CONTAINS ["remote", "eu"]
+      - "field_join": "and" | "or"
+            How this FIELD's expression combines with other fields
+            mapped to the same search_field.
+            Example:
+              name.field_join = OR
+              text.field_join = AND
+            => "(name_expr) OR (text_expr)" or "(name_expr) AND (text_expr)"
 
-    Result:
-      {
-        "keywords": "(data OR science) AND (python AND sql)",
-        "tags": "(remote OR eu)"
-      }
+      - "value_join": "and" | "or"
+            How multiple values inside THIS field combine.
+            If cond.value is ["data", "science"] and value_join="or":
+              field_expr = "(data OR science)"
+            If value_join="and":
+              field_expr = "(data AND science)"
     """
 
     if not where or resource is None:
         return {}
-    
+
     # Normalize to class
-    if isinstance(resource, BaseModel):
-        resource_cls = type(resource)
-    else:
-        resource_cls = resource
+    resource_cls = type(resource) if isinstance(resource, BaseModel) else resource
 
     # search_field -> {"or": [expr...], "and": [expr...]}
     per_search_field: Dict[str, Dict[str, List[str]]] = {}
@@ -403,12 +403,18 @@ def build_search_query_params(
             # malformed binding, skip
             continue
 
-        bool_join_raw = (binding.get("bool_join") or BoolJoin.OR.value).lower()
-        items_join_raw = (binding.get("items_join") or BoolJoin.AND.value).lower()
+        # How this FIELD combines with other fields for the same search_field
+        field_join_raw = str(
+            binding.get("field_join", BoolJoin.OR.value)
+        ).lower()
 
-        # Normalize to BoolJoin for safety (optional)
-        bool_join = BoolJoin.AND if bool_join_raw == BoolJoin.AND.value else BoolJoin.OR
-        items_join = BoolJoin.AND if items_join_raw == BoolJoin.AND.value else BoolJoin.OR
+        # How multiple VALUES inside this field combine
+        value_join_raw = str(
+            binding.get("value_join", BoolJoin.AND.value)
+        ).lower()
+
+        field_join = BoolJoin.AND if field_join_raw == BoolJoin.AND.value else BoolJoin.OR
+        value_join = BoolJoin.AND if value_join_raw == BoolJoin.AND.value else BoolJoin.OR
 
         values = _normalize_values_as_list(cond.value)
         if not values:
@@ -418,7 +424,7 @@ def build_search_query_params(
         if len(values) == 1:
             field_expr = values[0]
         else:
-            sep = " AND " if items_join == BoolJoin.AND else " OR "
+            sep = " AND " if value_join == BoolJoin.AND else " OR "
             field_expr = "(" + sep.join(values) + ")"
 
         buckets = per_search_field.setdefault(
@@ -426,12 +432,12 @@ def build_search_query_params(
             {"or": [], "and": []},
         )
 
-        if bool_join == BoolJoin.AND:
+        if field_join == BoolJoin.AND:
             buckets["and"].append(field_expr)
         else:
             buckets["or"].append(field_expr)
 
-    # Now assemble final query params per search_field
+    # Assemble final query params per search_field
     result: Dict[str, Any] = {}
 
     for search_field, groups in per_search_field.items():
@@ -443,14 +449,14 @@ def build_search_query_params(
 
         parts: List[str] = []
 
-        # OR block
+        # OR block (fields whose field_join == OR)
         if or_groups:
             if len(or_groups) == 1:
                 parts.append(or_groups[0])
             else:
                 parts.append("(" + " OR ".join(or_groups) + ")")
 
-        # AND block
+        # AND block (fields whose field_join == AND)
         if and_groups:
             and_block = (
                 and_groups[0]
@@ -591,5 +597,56 @@ def build_in_query_params(
             )
 
         params[query_field] = formatter(query_field, values)
+
+    return params
+
+
+def build_connector_params(
+    resource_cls: Type[BaseModel],
+    where: Optional[List[Condition]],
+    cursor: Optional[Cursor],
+    *,
+    sort_by_unified: Optional[str],
+    sort_param_name: Optional[str],
+) -> Dict[str, Any]:
+    """
+    Fonction utilitaire générique pour construire les query params envoyés
+    au connecteur HTTP à partir de :
+
+      - resource_cls : modèle natif du connecteur (ex: WarehouseAJob)
+      - where        : liste de Condition (EQ, IN, CONTAINS, etc.)
+      - cursor       : objet Cursor (start, end, mode, sort_by)
+      - sort_by_unified : nom du champ unifié (ex: "created_at")
+      - sort_param_name : nom du param HTTP pour le tri (ex: "order", "sort_by")
+
+    Cette fonction orchestre :
+      - build_eq_query_params    (EQ simples)
+      - build_in_query_params    (IN + in_binding)
+      - build_search_query_params (CONTAINS + search_binding)
+      - build_cursor_query_params (cursor_* metadata)
+    """
+
+    where = where or []
+    params: Dict[str, any] = {}
+
+    # 1) Filtres simples (EQ / GT / GTE / LT / LTE / CONTAINS "field__xxx")
+    params.update(build_eq_query_params(where))
+
+    # 2) IN avec in_binding + formatter (board_key -> board_keys, tags -> tags, ...)
+    params.update(build_in_query_params(where=where, resource=resource_cls))
+
+    # 3) SEARCH (keywords / tags...) via search_binding
+    params.update(build_search_query_params(where=where, resource=resource_cls))
+
+    # 4) CURSOR via metadata cursor_* sur le modèle
+    if cursor is not None:
+        params.update(
+            build_cursor_query_params(
+                cursor=cursor,
+                resource=resource_cls,
+                sort_by_native_name=sort_param_name,
+                sort_by_native_value=sort_by_unified,
+            )
+        )
 
     return params

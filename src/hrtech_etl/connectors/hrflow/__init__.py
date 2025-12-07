@@ -184,8 +184,8 @@ class WarehouseHrflowConnector(BaseConnector):
 
     def build_connector_query_params(self, resource, cursor = ..., where = None, cursor_min_native_name = None, 
                                      cursor_max_native_name = None, sort_by_native_name = "sort_by", sort_by_native_value = "asc", batch_size = 1000):
-        return super().build_connector_query_params(resource, cursor, where, cursor_min_native_name, cursor_max_native_name, sort_by_native_name, sort_by_native_value, batch_size)
-
+        query_params = super().build_connector_query_params(resource, cursor, where, cursor_min_native_name, cursor_max_native_name, sort_by_native_name, sort_by_native_value, batch_size)
+        provider_keys = query_params.get("source_keys", [])
 
 # ---------- Factory + Registry registration ----------
 

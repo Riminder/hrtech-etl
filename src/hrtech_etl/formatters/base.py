@@ -3,6 +3,8 @@ from typing import Any, Callable, Dict, List, Optional, Protocol, Sequence, Type
 
 from pydantic import BaseModel
 
+from hrtech_etl.core.types import Formatter
+
 JIn = TypeVar("JIn", bound=BaseModel)
 JOut = TypeVar("JOut")
 PIn = TypeVar("PIn", bound=BaseModel)
@@ -36,15 +38,28 @@ MappingSpec = Dict[str, str]  # {"from": "job_title", "to": "title"}
 
 def build_mapping_formatter(
     mapping: Sequence[MappingSpec],
-) -> Optional[Callable[[Any], Dict[str, Any]]]:
+) -> Optional[Formatter]:
     """
     Build a simple mapping-based formatter.
 
-    mapping: [{"from": "job_title", "to": "title"}, ...]
+    Parameters
+    ----------
+    mapping:
+        Sequence of {"from": src_field, "to": dst_field} dicts.
+        Example:
+            [{"from": "job_id", "to": "id"},
+             {"from": "title",  "to": "name"}]
 
-    Returns a callable that takes an origin object (Pydantic model, dataclass, etc.)
-    and returns a dict where:
-        data[dst] = getattr(origin_obj, src, None)
+    Returns
+    -------
+    formatter:
+        A callable suitable for use as a `Formatter` in the pipeline:
+            - Takes an origin object (Pydantic model, dataclass, etc.)
+            - Returns a `dict` where each `to` field is filled from
+              `getattr(origin_obj, from, None)`.
+
+        This dict is then wrapped into the *target* native model by
+        `safe_format_resources(...)`.
     """
     if not mapping:
         return None

@@ -1,27 +1,42 @@
 # hrtech_etl/cli.py
+from __future__ import annotations  # 👈 safe for 3.8+ if you want to keep | syntax
+
 import json
 import typer
 
-from hrtech_etl.core.types import Resource, Cursor, CursorMode, PushMode
+from hrtech_etl.core.types import (
+    Resource,
+    Cursor,
+    CursorMode,
+    PushMode,
+    Condition,
+    Operator,
+)
 from hrtech_etl.core.pipeline import pull, push
 from hrtech_etl.core.registry import get_connector_instance
-from hrtech_etl.core.expressions import Condition  # si tu as un helper / dataclass Condition
 
 
 app = typer.Typer()
 
 
 def _parse_conditions(raw: str | None) -> list[Condition] | None:
+    """
+    Expect JSON like:
+      [
+        {"field": "board_key", "op": "in", "value": ["b1", "b2"]},
+        {"field": "name", "op": "contains", "value": "engineer"}
+      ]
+    """
     if not raw:
         return None
     data = json.loads(raw)
-    # data = [{"field": "...", "op": "eq", "value": ...}, ...]
+
     conds: list[Condition] = []
     for item in data:
         conds.append(
             Condition(
                 field=item["field"],
-                op=item["op"],   # ou Operator(item["op"])
+                op=Operator(item["op"]),  # 👈 map string -> Operator enum
                 value=item["value"],
             )
         )
@@ -46,7 +61,13 @@ def pull_cmd(
     origin_conn = get_connector_instance(origin)
     target_conn = get_connector_instance(target)
 
-    cur = Cursor(mode=CursorMode(cursor_mode), start=cursor_start, end=None, sort_by=cursor_sort_by)
+    cur = Cursor(
+        mode=CursorMode(cursor_mode),
+        start=cursor_start,
+        end=None,
+        sort_by=cursor_sort_by,
+    )
+
     where_conds = _parse_conditions(where)
     having_conds = _parse_conditions(having)
 
@@ -76,11 +97,68 @@ def push_cmd(
     origin: str = typer.Option(...),
     target: str = typer.Option(...),
     mode: str = typer.Option("events"),   # events|resources
-    # tu peux passer events/resources via fichier ou stdin, à toi de voir
+    # TODO: add options to pass events/resources (file path, stdin, etc.)
 ):
-    # TODO: charger events/resources selon ton besoin
-    ...
+    # Not implemented yet – depends on how you want to feed events/resources.
+    typer.echo("push_cmd not implemented yet.")
 
 
-if __name__ == "__main__":
-    app()
+
+### Example usage:Simple pull: all jobs from warehouse_a → warehouse_a
+### No WHERE, no HAVING, just incremental pull on updated_at
+
+"""
+
+python -m hrtech_etl.cli pull-cmd \
+  --resource job \
+  --origin warehouse_a \
+  --target warehouse_a \
+  --cursor-mode updated_at \
+  --cursor-start "2024-01-01T00:00:00Z" \
+  --cursor-sort-by asc \
+  --batch-size 1000 \
+  --dry-run True
+
+"""
+
+### Example usage: Pull with WHERE filters (IN + CONTAINS)
+
+
+""""
+python -m hrtech_etl.cli pull-cmd \
+  --resource job \
+  --origin warehouse_a \
+  --target warehouse_a \
+  --cursor-mode updated_at \
+  --cursor-start "2024-01-01T00:00:00Z" \
+  --cursor-sort-by asc \
+  --where '[
+    {"field": "board_key", "op": "in", "value": ["board-1", "board-2"]},
+    {"field": "name",      "op": "contains", "value": "engineer"}
+  ]' \
+  --batch-size 1000 \
+  --dry-run True
+"""
+
+
+### Example usage: Pull with HAVING filters (EQ on payload field)
+
+"""
+python -m hrtech_etl.cli pull-cmd \
+    --resource job \
+    --origin warehouse_a \
+    --target warehouse_a \
+    --cursor-mode updated_at \
+    --cursor-start "2024-01-01T00:00:00Z"
+    --cursor-sort-by asc \
+    --where '[
+        {"field": "board_key", "op": "in", "value": ["board-1", "board-2"]},
+        {"field": "name",      "op": "contains", "value": "engineer"}
+    ]' \    
+    --having '[
+        {"field": "payload.status", "op": "eq", "value": "closed"}
+    ]' \
+    --batch-size 1000 \
+    --dry-run True
+
+"""

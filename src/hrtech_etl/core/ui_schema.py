@@ -9,26 +9,61 @@ def export_model_fields(
     only_prefilterable: bool = False,
 ) -> List[Dict[str, Any]]:
     """
-    Return metadata about a Pydantic model's fields for UI use.
+    Inspect a Pydantic model and expose its fields as a simple schema for the UI.
 
-    If filterable_only is False:
-        - returns ALL fields with any extra metadata (cursor/filter/…)
-    If filterable_only is True:
-        - returns ONLY fields that have filter.eligible = True in json_schema_extra
+    Parameters
+    ----------
+    model_cls:
+        The Pydantic model class to introspect
+        (e.g. `UnifiedJob`, `WarehouseAJob`, `UnifiedProfile`, ...).
 
-    Example output (filterable_only=False):
-    [
-      {
-        "name": "job_id",
-        "type": "str",
-        "cursor": "id",
-        "filter": {
-          "eligible": true,
-          "operators": ["eq", "in"]
-        }
-      },
-      ...
-    ]
+    only_prefilterable:
+        - If False (default):
+            Return **all** fields of the model, with any relevant metadata
+            found in `json_schema_extra` (e.g. `cursor`, `prefilter`).
+        - If True:
+            Return **only** fields that are marked as prefilterable, i.e. fields
+            having a `json_schema_extra["prefilter"]` block.
+
+            This is typically used to build the list of fields that can be used
+            in the "WHERE / Prefilter" section of the UI.
+
+    Returned structure
+    ------------------
+    A list of JSON-serializable dictionaries, one per field, e.g.:
+
+        [
+          {
+            "name": "created_at",
+            "type": "str",
+            "cursor": "created_at",
+            "prefilter": {
+              "operators": ["gte", "lte"]
+            }
+          },
+          {
+            "name": "board_key",
+            "type": "str",
+            "prefilter": {
+              "operators": ["in"]
+            }
+          },
+          {
+            "name": "payload",
+            "type": "dict"
+          },
+          ...
+        ]
+
+    Notes
+    -----
+    - The function is compatible with both Pydantic v1 and v2:
+      it reads metadata from `field.json_schema_extra` (v2) or
+      `field.field_info.extra` (v1), if present.
+
+    - Only `cursor` and `prefilter` blocks are currently surfaced
+      to the UI, but the function can be extended easily if you
+      add more metadata in `json_schema_extra`.
     """
     fields_map = getattr(model_cls, "model_fields", None) or getattr(
         model_cls, "__fields__", {}

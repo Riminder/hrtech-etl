@@ -382,7 +382,7 @@ async def playground(request: Request):
         cursor_mode=cursor.mode.value if cursor else None,
         cursor_start=cursor.start if cursor else None,
         cursor_end=cursor.end if cursor else None,
-        cursor_sort_by=cursor.sort_by.value if cursor else None,
+        cursor_sort_by=cursor.sort_by if cursor else None,
         origin_fields=origin_fields,
         target_fields=target_fields,
         origin_prefilter_fields=origin_prefilter_fields,

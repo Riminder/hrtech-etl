@@ -245,13 +245,41 @@
       </p>
       {% if resource == "job" %}
       <pre>[
-  {"event_id": "e1", "job_id": "1", "event_type": "UPDATED", "timestamp": "2024-01-01T12:00:00Z"},
-  {"event_id": "e2", "job_id": "2", "event_type": "CREATED", "timestamp": "2024-01-02T09:30:00Z"}
+  {
+    "event_id": "e1",
+    "job_id": "1",
+    "type": "UPDATED",
+    "occurred_at": "2024-01-01T12:00:00Z",
+    "payload": {},
+    "metadata": {}
+  },
+  {
+    "event_id": "e2",
+    "job_id": "2",
+    "type": "CREATED",
+    "occurred_at": "2024-01-02T09:30:00Z",
+    "payload": {},
+    "metadata": {}
+  }
 ]</pre>
       {% else %}
       <pre>[
-  {"event_id": "e1", "profile_id": "1", "event_type": "UPDATED", "timestamp": "2024-01-01T12:00:00Z"},
-  {"event_id": "e2", "profile_id": "2", "event_type": "CREATED", "timestamp": "2024-01-02T09:30:00Z"}
+  {
+    "event_id": "e1",
+    "profile_id": "1",
+    "type": "UPDATED",
+    "occurred_at": "2024-01-01T12:00:00Z",
+    "payload": {},
+    "metadata": {}
+  },
+  {
+    "event_id": "e2",
+    "profile_id": "2",
+    "type": "CREATED",
+    "occurred_at": "2024-01-02T09:30:00Z",
+    "payload": {},
+    "metadata": {}
+  }
 ]</pre>
       {% endif %}
       <textarea name="events_json">{{ events_json }}</textarea>

@@ -183,7 +183,7 @@ class UnifiedJob(BaseModel):
             "prefilter": {"operators": ["in"]},
             "in_binding": {
                 "query_field": "board_keys",   # query field name
-                "formatter": "string_array",    # which formatter to use from .utils.formatters csv, array, string_array
+                "formatter": "array_string",    # which formatter to use from .utils.formatters csv, array, array_string
             },
         },
         description="Identification key of the Board attached to the Job.",
@@ -227,8 +227,8 @@ class UnifiedJob(BaseModel):
             "search_binding": {
                 "search_field": "keywords",
                 # How this group combines with other groups (title, summary, etc.)
-                "group_join": BoolJoin.AND,      # => (name) OR (skills
-                # "field_join": BoolJoin.OR,        # => name1 OR name2 OR name3...
+                "field_join": BoolJoin.AND,      # => (name) OR (skills
+                "value_join": BoolJoin.OR,        # => name1 OR name2 OR name3...
             }
         },
         description="Job title.",
@@ -243,8 +243,8 @@ class UnifiedJob(BaseModel):
         "search_binding": {
             "search_field": "keywords",
             # How this group combines with other groups (title, summary, etc.)
-            "group_join": BoolJoin.AND,      # => (text) AND (skills...)
-            # "field_join": BoolJoin.OR,        # => text1 OR text2 OR text3...
+            "field_join": BoolJoin.AND,      # => (text) AND (skills...)
+            "value_join": BoolJoin.OR,        # => text1 OR text2 OR text3...
             },
         }
     )
@@ -289,7 +289,7 @@ class UnifiedJob(BaseModel):
         "prefilter": {"operators": ["in"]},
         "in_binding": {
             "query_field": "tags",   # query field name
-            "formatter": "string_array",    # which formatter to use from .utils.formatters: csv, array, string_array
+            "formatter": "array_string",    # which formatter to use from .utils.formatters: csv, array, array_string
             },
         }
     )
@@ -450,7 +450,7 @@ class UnifiedProfile(BaseModel):
             "prefilter": {"operators": ["in"]},
         "in_binding": {
             "query_field": "source_keys",   # query field name
-            "formatter": "string_array",    # which formatter to use from .utils.formatters csv, array, string_array
+            "formatter": "array_string",    # which formatter to use from .utils.formatters csv, array, array_string
             },
         },
     )
@@ -494,8 +494,8 @@ class UnifiedProfile(BaseModel):
         "search_binding": {
             "search_field": "keywords",
             # How this group combines with other groups (title, summary, etc.)
-            "group_join": BoolJoin.AND,      # => (text) AND (skills...)
-            # "field_join": BoolJoin.OR,        # => text1 OR text2 OR text3...
+            "field_join": BoolJoin.AND,      # => (text) AND (skills...)
+            "value_join": BoolJoin.OR,        # => text1 OR text2 OR text3...
             },
         }
     )
