@@ -11,7 +11,7 @@ from hrtech_etl.connectors.hrflow.models import (
     WarehouseHrflowProfile,
 )
 from hrtech_etl.core.types import Cursor, CursorMode
-from hrtech_etl.core.utils import get_cursor_native_value, get_cursor_native_value
+from hrtech_etl.core.utils import get_cursor_native_value
 
 
 class WarehouseHrflowActions(BaseModel):

@@ -148,17 +148,8 @@ class WarehouseAConnector(BaseConnector):
         params["limit"] = batch_size
 
         jobs = self.actions.fetch_jobs(params=params)
-        #TODO factorize 
-        if not jobs:
-            return [], cursor.start
-        
-        next_cursor = get_cursor_native_value(
-            cursor=cursor,
-            resource_cls=WarehouseAJob,
-            last_items=jobs[-1:],
-            sort_by_unified=sort_by_unified,
-        )
-        return jobs, next_cursor
+
+        return self._finalize_read_batch(resources=jobs, cursor=cursor)
 
     def _write_jobs_native(self, jobs: List[BaseModel]) -> None:
         assert all(isinstance(j, WarehouseAJob) for j in jobs)
@@ -251,16 +242,8 @@ class WarehouseAConnector(BaseConnector):
 
         profiles = self.actions.fetch_profiles(params=params)
 
-        #TODO factorize
-        if not profiles:
-            return [], cursor.start
-        next_cursor = get_cursor_native_value(
-            cursor=cursor,
-            resource_cls=WarehouseAProfile,
-            last_items=profiles[-1:],
-            sort_by_unified=sort_by_unified,
-        )
-        return profiles, next_cursor
+        return self._finalize_read_batch(resources=profiles, cursor=cursor)
+
 
     def _write_profiles_native(self, profiles: List[BaseModel]) -> None:
         assert all(isinstance(p, WarehouseAProfile) for p in profiles)
