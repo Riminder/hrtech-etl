@@ -17,7 +17,7 @@ from hrtech_etl.core.models import (
 )
 from hrtech_etl.core.registry import ConnectorMeta, register_connector
 from hrtech_etl.core.types import Condition, Cursor, CursorMode, WarehouseType, Resource
-from hrtech_etl.core.utils import build_connector_params
+from hrtech_etl.core.utils import build_connector_params, get_cursor_native_value
 
 from .models import (
     WarehouseAJob,
@@ -147,7 +147,17 @@ class WarehouseAConnector(BaseConnector):
         )
         params["limit"] = batch_size
 
-        jobs, next_cursor = self.actions.fetch_jobs(params=params)
+        jobs = self.actions.fetch_jobs(params=params)
+        #TODO factorize 
+        if not jobs:
+            return [], cursor.start
+        
+        next_cursor = get_cursor_native_value(
+            cursor=cursor,
+            resource_cls=WarehouseAJob,
+            last_items=jobs[-1:],
+            sort_by_unified=sort_by_unified,
+        )
         return jobs, next_cursor
 
     def _write_jobs_native(self, jobs: List[BaseModel]) -> None:
@@ -239,7 +249,17 @@ class WarehouseAConnector(BaseConnector):
         )
         params["limit"] = batch_size
 
-        profiles, next_cursor = self.actions.fetch_profiles(params=params)
+        profiles = self.actions.fetch_profiles(params=params)
+
+        #TODO factorize
+        if not profiles:
+            return [], cursor.start
+        next_cursor = get_cursor_native_value(
+            cursor=cursor,
+            resource_cls=WarehouseAProfile,
+            last_items=profiles[-1:],
+            sort_by_unified=sort_by_unified,
+        )
         return profiles, next_cursor
 
     def _write_profiles_native(self, profiles: List[BaseModel]) -> None:

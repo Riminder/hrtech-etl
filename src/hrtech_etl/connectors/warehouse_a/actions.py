@@ -28,7 +28,7 @@ class WarehouseAActions(BaseModel):
     def fetch_jobs(
         self,
         params: Dict[str, Any],
-    ) -> Tuple[List[WarehouseAJob], Optional[str]]:
+    ) -> List[WarehouseAJob]:
         """
         Execute a GET /jobs (or equivalent) with the given query params.
 
@@ -44,7 +44,7 @@ class WarehouseAActions(BaseModel):
         # data = resp.json()
         # jobs = [WarehouseAJob(**item) for item in data["items"]]
         # next_cursor = data.get("next_cursor")
-        # return jobs, next_cursor
+        # return jobs
         #
         raise NotImplementedError(f"Implement HTTP GET /jobs with params={params!r}")
 
@@ -69,7 +69,7 @@ class WarehouseAActions(BaseModel):
     def fetch_profiles(
         self,
         params: Dict[str, Any],
-    ) -> Tuple[List[WarehouseAProfile], Optional[str]]:
+    ) -> List[WarehouseAProfile]:
         """
         Execute a GET /profiles (or equivalent) with the given query params.
         """
@@ -82,7 +82,7 @@ class WarehouseAActions(BaseModel):
         # data = resp.json()
         # profiles = [WarehouseAProfile(**item) for item in data["items"]]
         # next_cursor = data.get("next_cursor")
-        # return profiles, next_cursor
+        # return profiles
         #
         raise NotImplementedError(f"Implement HTTP GET /profiles with params={params!r}")
 
