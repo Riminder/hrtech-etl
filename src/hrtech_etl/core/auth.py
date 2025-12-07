@@ -79,10 +79,122 @@ class BearerAuth(BaseAuth):
     def as_headers(self) -> Dict[str, str]:
         return {"Authorization": f"Bearer {self.token}"}
 
+class OAuth1Auth(BaseAuth):
+    def __init__(
+        self,
+        base_url: str,
+        client_key: str,
+        client_secret: str,
+        resource_owner_key: str,
+        resource_owner_secret: str,
+        extra_headers: Optional[Dict[str, str]] = None,
+    ):
+        super().__init__(base_url=base_url, extra_headers=extra_headers)
+        self.client_key = client_key
+        self.client_secret = client_secret
+        self.resource_owner_key = resource_owner_key
+        self.resource_owner_secret = resource_owner_secret
+
+    def as_headers(self) -> Dict[str, str]:
+        # OAuth1 typically uses an Authorization header with a specific format.
+        # Here we just return an empty dict as a placeholder.
+        return {}
+
+    
+class OAuth2Auth(BaseAuth):
+    def __init__(
+        self,
+        base_url: str,
+        client_id: str,
+        client_secret: str,
+        token_url: str,
+        scope: Optional[str] = None,
+        extra_headers: Optional[Dict[str, str]] = None,
+    ):
+        super().__init__(base_url=base_url, extra_headers=extra_headers)
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.token_url = token_url
+        self.scope = scope
+        self._access_token: Optional[str] = None
+
+    def _fetch_access_token(self) -> str:
+        import requests
+
+        data = {
+            "grant_type": "client_credentials",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+        }
+        if self.scope:
+            data["scope"] = self.scope
+
+        resp = requests.post(self.token_url, data=data)
+        resp.raise_for_status()
+        token_data = resp.json()
+        return token_data["access_token"]
+
+    def as_headers(self) -> Dict[str, str]:
+        if not self._access_token:
+            self._access_token = self._fetch_access_token()
+        return {"Authorization": f"Bearer {self._access_token}"}
+
+
+class LoginAuth(BaseAuth):
+    def __init__(
+        self,
+        base_url: str,
+        username: str,
+        password: str,
+        extra_headers: Optional[Dict[str, str]] = None,
+    ):
+        super().__init__(base_url=base_url, extra_headers=extra_headers)
+        self.username = username
+        self.password = password
+        self._session_token: Optional[str] = None
+
+    def _login(self) -> str:
+        import requests
+
+        resp = requests.post(
+            f"{self.base_url}/login",
+            json={"username": self.username, "password": self.password},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data["session_token"]
+
+    def as_headers(self) -> Dict[str, str]:
+        if not self._session_token:
+            self._session_token = self._login()
+        return {"Authorization": f"Bearer {self._session_token}"}
+
+
+class NoAuth(BaseAuth):
+    def __init__(
+        self,
+        base_url: str,
+        extra_headers: Optional[Dict[str, str]] = None,
+    ):
+        super().__init__(base_url=base_url, extra_headers=extra_headers)
+
+    def as_headers(self) -> Dict[str, str]:
+        return {}
+
+
+# Optional: you can add more specialized auth classes here (OAuth, etc.)
+
+
+# -------- Registry + factory helper --------
+
 _AUTH_KINDS = {
     "api_key": ApiKeyAuth,
     "bearer": BearerAuth,
     "token": TokenAuth,
+    "oauth1": OAuth1Auth,
+    "oauth2": OAuth2Auth,
+    "login": LoginAuth,
+    "none": NoAuth,
 }
 
 
