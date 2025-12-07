@@ -37,31 +37,21 @@ class WarehouseHrflowConnector(BaseConnector):
             actions=actions,
         )
 
-    # -------- JOBS: unified ↔ native --------
+    # ------------------------------------------------------------------
+    # JOBS: unified ↔ native
+    # ------------------------------------------------------------------
 
     def to_unified_job(self, native: BaseModel) -> UnifiedJob:
         assert isinstance(native, WarehouseHrflowJob)
+        payload = dict(native)
         return UnifiedJob(
-            job_id=native.key,
-            title=native.name,
-            created_at=native.created_at,
-            updated_at=native.updated_at,
-            payload=native.payload,
-            metadata={
-                "connector": self.name,
-                "warehouse_type": self.warehouse_type.value,
-            },
+            **payload,
+            origin=self.name,
+            payload=payload,
         )
 
     def from_unified_job(self, unified: UnifiedJob) -> WarehouseHrflowJob:
-        return WarehouseHrflowJob(
-            key=unified.job_id,
-            reference=unified.job_id,
-            name=unified.title or "",
-            created_at=unified.created_at or unified.updated_at,
-            updated_at=unified.updated_at or unified.created_at,
-            payload=unified.payload,
-        )
+        return WarehouseHrflowJob(**dict(unified))
 
     def read_jobs_batch(
         self,
@@ -105,28 +95,15 @@ class WarehouseHrflowConnector(BaseConnector):
 
     def to_unified_profile(self, native: BaseModel) -> UnifiedProfile:
         assert isinstance(native, WarehouseHrflowProfile)
-        # FIXME: requires core update to align WarehouseHrflowProfile <-> UnifiedProfile
+        payload = dict(native)
         return UnifiedProfile(
-            profile_id=native.key,
-            full_name=native.info.full_name,
-            created_at=native.created_at,
-            updated_at=native.updated_at,
-            payload=native.payload,
-            metadata={
-                "connector": self.name,
-                "warehouse_type": self.warehouse_type.value,
-            },
+            **payload,
+            origin=self.name,
+            payload=payload,
         )
 
     def from_unified_profile(self, unified: UnifiedProfile) -> WarehouseHrflowProfile:
-        # FIXME: requires core update to align WarehouseHrflowProfile <-> UnifiedProfile
-        return WarehouseHrflowProfile(
-            key=unified.profile_id,
-            reference=unified.profile_id,
-            created_at=unified.created_at or unified.updated_at,
-            updated_at=unified.updated_at or unified.created_at,
-            payload=unified.payload,
-        )
+        return WarehouseHrflowProfile(**dict(unified))
 
     def read_profiles_batch(
         self,
@@ -137,7 +114,7 @@ class WarehouseHrflowConnector(BaseConnector):
         """
         High-level read for profiles:
 
-          - builds query params (EQ / IN / search / cursor) using WarehouseAProfile metadata
+          - builds query params (EQ / IN / search / cursor) with Warehouse metadata
           - delegates to actions.fetch_profiles(params)
         """
         where = where or []
@@ -160,12 +137,13 @@ class WarehouseHrflowConnector(BaseConnector):
         assert all(isinstance(p, WarehouseHrflowProfile) for p in profiles)
         self.actions.upsert_profiles(profiles)  # type: ignore[arg-type]
 
-
     def get_profile_id(self, native_profile: BaseModel) -> str:
         assert isinstance(native_profile, WarehouseHrflowProfile)
         return native_profile.profile_id
 
-    # -------- EVENTS: JOBS --------
+    # ------------------------------------------------------------------
+    # EVENTS: JOBS
+    # ------------------------------------------------------------------
 
     def parse_job_event(self, raw: Any) -> UnifiedJobEvent | None:
         native_ev = WarehouseHrflowJobEvent.from_raw(raw)
@@ -179,7 +157,9 @@ class WarehouseHrflowConnector(BaseConnector):
         job_ids = [ev.job_id for ev in events]
         return self.actions.fetch_jobs_by_ids(job_ids)
 
-    # -------- EVENTS: PROFILES --------
+    # ------------------------------------------------------------------
+    # EVENTS: PROFILES
+    # ------------------------------------------------------------------
 
     def parse_profile_event(self, raw: Any) -> UnifiedProfileEvent | None:
         native_ev = WarehouseHrflowProfileEvent.from_raw(raw)
@@ -194,7 +174,9 @@ class WarehouseHrflowConnector(BaseConnector):
         return self.actions.fetch_profiles_by_ids(profile_ids)
 
 
-# ---------- Factory + Registry registration ----------
+# ----------------------------------------------------------------------
+# Factory + Registry registration
+# ----------------------------------------------------------------------
 
 
 def _build_default_connector() -> WarehouseHrflowConnector:
@@ -203,17 +185,18 @@ def _build_default_connector() -> WarehouseHrflowConnector:
     Replace dummy values with env-driven config when wiring for real.
     """
     # Question: why do we have the redundant api key usage ?
-    auth = ApiKeyAuth("X-API-Key", "dummy_api_key")
-    actions = WarehouseHrflowActions(
+    auth = ApiKeyAuth(
         base_url="https://api.hrflow.ai/v1",
+        header_name="X-API-Key",
         api_key="dummy_api_key",
-        api_user_email="dummy@example.com",
-        provider_key="dummy_board_key",
+        extra_headers={
+            "X-API-User-Email": "dummy@example.com",
+        },
     )
-    return WarehouseHrflowConnector(auth=auth, actions=actions)
+    actions = WarehouseHrflowActions(auth=auth)
+    return WarehouseHrflowConnector(actions=actions)
 
 
-# Register for UI / config usage
 register_connector(
     ConnectorMeta(
         name="warehouse_hrflow",
@@ -227,7 +210,7 @@ register_connector(
             "hrtech_etl.connectors." "warehouse_hrflow.WarehouseHrflowConnector"
         ),
     ),
-    factory=_build_default_connector,  # 👈 important
+    factory=_build_default_connector,
 )
 
 

@@ -1,8 +1,8 @@
 import argparse
 
 from hrtech_etl.connectors.hrflow import (
-    WarehouseHrflowConnector,
     WarehouseHrflowActions,
+    WarehouseHrflowConnector,
 )
 from hrtech_etl.core.auth import ApiKeyAuth
 from hrtech_etl.core.pipeline import pull
