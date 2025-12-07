@@ -16,8 +16,13 @@ from .utils import (
 
 class BaseConnector(ABC):
     """
-    One connector per external system (ATS / CRM / Jobboard / HCM).
-    Handles jobs, profiles, and their unified conversions.
+    Base class for all connectors.
+
+    Each concrete connector:
+      - sets job_native_cls / profile_native_cls
+      - implements to_unified_*/from_unified_*
+      - implements read_resources_batch/write_resources_batch/get_resource_id...
+      - builds its own low-level actions client from auth.
     """
 
     # Native Pydantic models for this warehouse
@@ -28,19 +33,19 @@ class BaseConnector(ABC):
 
     # --- AUTH / INIT ---
 
-    def __init__(
-        self,
-        auth: BaseAuth,
-        name: str,
-        warehouse_type: WarehouseType,
-        actions: BaseModel,
-    ):
+    def __init__(self, auth: BaseAuth, name: str, warehouse_type: WarehouseType):
         self.auth = auth
         self.name = name
         self.warehouse_type = warehouse_type
-        self.actions = actions
+        self.actions = self._build_actions()
 
-
+    @abstractmethod
+    def _build_actions(self) -> Any:
+        """
+        Return the low-level actions client for this connector.
+        Typically something like WarehouseAActions(auth=self.auth).
+        """
+        ...
 
     # --- JOBS PRIMITIVES: READ / WRITE / CURSOR ---
 

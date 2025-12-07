@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from hrtech_etl.core.connector import BaseConnector
 from hrtech_etl.core.registry import list_connectors, get_connector_instance
-from hrtech_etl.core.ui_schema import export_model_fields
+from hrtech_etl.core.ui_schema import export_model_fields, export_auth_fields
 from hrtech_etl.core.types import (
     Condition,
     Operator,
@@ -21,6 +21,7 @@ from hrtech_etl.core.types import (
 from hrtech_etl.core.expressions import Prefilter
 from hrtech_etl.core.pipeline import pull, push
 from hrtech_etl.core.models import UnifiedJobEvent, UnifiedProfileEvent
+from hrtech_etl.core.auth import BaseAuth
 from hrtech_etl.formatters.base import build_mapping_formatter
 
 router = APIRouter()
@@ -28,6 +29,11 @@ templates = Jinja2Templates(directory="app/templates")
 
 MAX_MAPPING_ROWS = 5
 MAX_FILTER_ROWS = 5
+
+
+# ---------------------------------------------------------------------------
+# MAPPING / FILTERS HELPERS
+# ---------------------------------------------------------------------------
 
 
 def _parse_mapping_from_form(form: Dict[str, Any]) -> List[Dict[str, str]]:
@@ -94,6 +100,11 @@ def _parse_postfilter_conditions(form: Dict[str, Any]) -> List[Condition]:
         conditions.append(cond)
 
     return conditions
+
+
+# ---------------------------------------------------------------------------
+# RESOURCES / EVENTS JSON HELPERS
+# ---------------------------------------------------------------------------
 
 
 def _parse_resources_json(
@@ -164,6 +175,90 @@ def _parse_events_json(
     return events
 
 
+# ---------------------------------------------------------------------------
+# AUTH HELPERS (AUTO-EXPOSE + PARSE FROM FORM)
+# ---------------------------------------------------------------------------
+
+
+def _export_auth_fields_for_connector(conn: BaseConnector) -> List[Dict[str, Any]]:
+    """
+    Return UI metadata for the connector's auth fields, if any.
+
+    Uses export_auth_fields(...) on the concrete BaseAuth subclass.
+    """
+    auth = getattr(conn, "auth", None)
+    if not isinstance(auth, BaseAuth):
+        return []
+    return export_auth_fields(type(auth))
+
+
+def _parse_auth_from_form(
+    form: Dict[str, Any],
+    prefix: str,
+    default_auth: BaseAuth | None,
+) -> BaseAuth | None:
+    """
+    Rebuild an auth object from form fields with a given prefix.
+
+    - prefix: e.g. "origin_auth_" or "target_auth_"
+    - default_auth: the existing auth instance (to infer the class and defaults)
+
+    Rules:
+      - If no auth fields are present in the form, return default_auth unchanged.
+      - For 'extra_headers', value is expected as JSON.
+      - Automatically preserve auth_type when not provided by the form.
+    """
+    if default_auth is None:
+        return None
+
+    auth_cls = type(default_auth)
+    fields_map = getattr(auth_cls, "model_fields", None) or getattr(
+        auth_cls, "__fields__", {}
+    )
+
+    payload: Dict[str, Any] = {}
+    any_seen = False
+
+    for name, field in fields_map.items():
+        # auth_type usually has a fixed default; keep it unless overridden
+        if name == "auth_type":
+            payload[name] = getattr(default_auth, "auth_type", None)
+            continue
+
+        form_key = f"{prefix}{name}"
+        if form_key not in form:
+            # keep existing default if user didn't touch this field
+            continue
+
+        raw = form.get(form_key)
+        if raw is None or raw == "":
+            continue
+
+        any_seen = True
+
+        if name == "extra_headers":
+            # Expect a JSON object
+            try:
+                payload[name] = json.loads(raw)
+            except json.JSONDecodeError:
+                payload[name] = {}
+        else:
+            payload[name] = raw
+
+    if not any_seen:
+        return default_auth
+
+    # Rebuild a fresh auth object with provided overrides
+    if hasattr(auth_cls, "model_validate"):  # pydantic v2
+        return auth_cls.model_validate(payload)  # type: ignore[attr-defined]
+    return auth_cls.parse_obj(payload)  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
+# CONTEXT BUILDER
+# ---------------------------------------------------------------------------
+
+
 def _build_context(
     request: Request,
     operation: str,
@@ -183,6 +278,8 @@ def _build_context(
     events_json: str,
     result_summary: Optional[str],
     error_message: Optional[str],
+    origin_auth_fields: List[Dict[str, Any]],
+    target_auth_fields: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     return {
         "request": request,
@@ -204,9 +301,16 @@ def _build_context(
         "events_json": events_json,
         "result_summary": result_summary,
         "error_message": error_message,
+        "origin_auth_fields": origin_auth_fields,
+        "target_auth_fields": target_auth_fields,
         "MAX_MAPPING_ROWS": MAX_MAPPING_ROWS,
         "MAX_FILTER_ROWS": MAX_FILTER_ROWS,
     }
+
+
+# ---------------------------------------------------------------------------
+# MAIN ROUTE
+# ---------------------------------------------------------------------------
 
 
 @router.api_route("/playground", methods=["GET", "POST"], response_class=HTMLResponse)
@@ -218,6 +322,7 @@ async def playground(request: Request):
     - push.mode: RESOURCES | EVENTS
     - Select origin/target connectors
     - Select resource: job | profile
+    - Configure auth fields per connector (base_url, api_key, token, etc.)
     - Build field mappings (formatter)
     - Define pre-filters (Prefilter) for pull
     - Define post-filters (in-memory HAVING) for both pull and push
@@ -264,6 +369,25 @@ async def playground(request: Request):
         target_connector: BaseConnector = get_connector_instance(target_name)
     except KeyError:
         return HTMLResponse("<h1>Unknown connector selected</h1>", status_code=400)
+
+    # --- AUTH: export fields for UI (BEFORE parsing form) ---
+    origin_auth_fields = _export_auth_fields_for_connector(origin_connector)
+    target_auth_fields = _export_auth_fields_for_connector(target_connector)
+
+    # --- AUTH: update connector auths from POSTed form values (if any) ---
+    if request.method == "POST":
+        if isinstance(getattr(origin_connector, "auth", None), BaseAuth):
+            origin_connector.auth = _parse_auth_from_form(
+                form=form,
+                prefix="origin_auth_",
+                default_auth=origin_connector.auth,  # type: ignore[arg-type]
+            )
+        if isinstance(getattr(target_connector, "auth", None), BaseAuth):
+            target_connector.auth = _parse_auth_from_form(
+                form=form,
+                prefix="target_auth_",
+                default_auth=target_connector.auth,  # type: ignore[arg-type]
+            )
 
     # choose native model classes for the resource
     if resource_enum == Resource.JOB:
@@ -391,5 +515,7 @@ async def playground(request: Request):
         events_json=events_json,
         result_summary=result_summary,
         error_message=error_message,
+        origin_auth_fields=origin_auth_fields,
+        target_auth_fields=target_auth_fields,
     )
     return templates.TemplateResponse("playground.html", context)

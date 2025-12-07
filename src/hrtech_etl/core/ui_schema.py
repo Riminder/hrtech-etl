@@ -102,3 +102,79 @@ def export_model_fields(
         result.append(field_info)
 
     return result
+
+
+def export_auth_fields(auth_cls: Type[BaseModel]) -> List[Dict[str, Any]]:
+    """
+    Introspect an auth Pydantic model (e.g. ApiKeyAuth, BearerAuth, TokenAuth)
+    and return a list of field descriptors for UI use.
+
+    Example output for ApiKeyAuth(base_url, header_name, api_key):
+    [
+      {
+        "name": "base_url",
+        "type": "str",
+        "required": True,
+        "default": None,
+      },
+      {
+        "name": "header_name",
+        "type": "str",
+        "required": True,
+        "default": "X-API-Key",
+      },
+      {
+        "name": "api_key",
+        "type": "str",
+        "required": True,
+        "default": None,
+      },
+    ]
+
+    Notes:
+    - We treat *all* public Pydantic fields as potential UI fields.
+    - You can choose to skip internal fields (e.g. "auth_type") if desired.
+    """
+
+    # If someone passes an *instance*, normalize to class.
+    if not isinstance(auth_cls, type):
+        auth_cls = type(auth_cls)
+
+    if not issubclass(auth_cls, BaseModel):
+        # For non-Pydantic auth, we can't introspect reliably.
+        return []
+
+    fields_map = getattr(auth_cls, "model_fields", None) or getattr(
+        auth_cls, "__fields__", {}
+    )
+
+    result: List[Dict[str, Any]] = []
+
+    for name, f in fields_map.items():
+        # Optionally skip internal/meta fields, e.g. "auth_type"
+        if name in {"auth_type"}:
+            continue
+
+        annotation = getattr(f, "annotation", Any)
+        py_type = getattr(annotation, "__name__", str(annotation))
+
+        # Pydantic v1/v2 compatibility
+        required = getattr(f, "is_required", None)
+        if callable(required):
+            is_required = required()
+        else:
+            # best-effort fallback
+            is_required = f.default is None and f.default_factory is None
+
+        default = getattr(f, "default", None)
+
+        result.append(
+            {
+                "name": name,
+                "type": py_type,
+                "required": is_required,
+                "default": default,
+            }
+        )
+
+    return result

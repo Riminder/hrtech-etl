@@ -219,12 +219,47 @@ def _load_callable(path: str) -> Callable[..., Any]:
     module = import_module(module_name)
     return getattr(module, attr)
 
+from hrtech_etl.core.auth import BaseAuth, ApiKeyAuth, BearerAuth, TokenAuth
+
+_AUTH_KINDS = {
+    "api_key": ApiKeyAuth,
+    "bearer": BearerAuth,
+    "token": TokenAuth,
+}
+
+
+def build_auth_from_payload(
+    auth_payload: dict[str, Any],
+    default_auth: BaseAuth,
+) -> BaseAuth:
+    """
+    Build a concrete auth object from JSON payload.
+
+    If 'auth_type' is present, we use it to select the subclass.
+    Otherwise we fall back to the default_auth's class.
+    """
+    if not auth_payload:
+        return default_auth
+
+    auth_type = auth_payload.get("auth_type") or auth_payload.get("type")
+    if auth_type:
+        auth_cls = _AUTH_KINDS.get(auth_type)
+        if auth_cls is None:
+            raise ValueError(f"Unknown auth_type: {auth_type!r}")
+    else:
+        auth_cls = type(default_auth)
+
+    # Pydantic v2
+    return auth_cls.model_validate(auth_payload)
+
 
 class ResourcePullConfig(BaseModel):
     resource: str
     origin: str
     target: str
     cursor: Cursor
+    origin_auth: Optional[dict[str, Any]] = None
+    target_auth: Optional[dict[str, Any]] = None
     where: List[Condition] = Field(default_factory=list)
     having: List[Condition] = Field(default_factory=list)
     formatter: Optional[str] = None
@@ -239,11 +274,18 @@ def run_resource_pull_from_config(cfg: ResourcePullConfig) -> Any:
     target: BaseConnector = get_connector_instance(cfg.target)
     formatter = _load_callable(cfg.formatter) if cfg.formatter else None
 
+    if cfg.origin_auth is not None:
+        origin.auth = build_auth_from_payload(cfg.origin_auth, origin.auth)
+    if cfg.target_auth is not None:
+        target.auth = build_auth_from_payload(cfg.target_auth, target.auth)
+
     return pull(
         resource=resource,
         origin=origin,
         target=target,
         cursor=cfg.cursor,
+        origin_auth=cfg.origin_auth,
+        target_auth=cfg.target_auth,
         where=cfg.where,
         having=cfg.having,
         formatter=formatter,
@@ -252,11 +294,14 @@ def run_resource_pull_from_config(cfg: ResourcePullConfig) -> Any:
     )
 
 
+
 class ResourcePushConfig(BaseModel):
     resource: str
     origin: str
     target: str
     mode: str
+    origin_auth: Optional[dict[str, Any]] = None
+    target_auth: Optional[dict[str, Any]] = None
     events: Optional[List[BaseModel]] = None
     resources: Optional[List[BaseModel]] = None
     having: List[Condition] = Field(default_factory=list)
@@ -272,11 +317,18 @@ def run_resource_push_from_config(cfg: ResourcePushConfig) -> PushResult:
     mode: PushMode = PushMode(cfg.mode)
     formatter = _load_callable(cfg.formatter) if cfg.formatter else None
 
+    if cfg.origin_auth is not None:
+        origin.auth = build_auth_from_payload(cfg.origin_auth, origin.auth)
+    if cfg.target_auth is not None:
+        target.auth = build_auth_from_payload(cfg.target_auth, target.auth)
+    
     return push(
         resource=resource,
         origin=origin,
         target=target,
         mode=mode,
+        origin_auth=cfg.origin_auth,
+        target_auth=cfg.target_auth,
         events=cfg.events,
         resources=cfg.resources,
         having=cfg.having,

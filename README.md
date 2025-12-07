@@ -93,20 +93,26 @@ from hrtech_etl.core.types import Resource, Cursor, CursorMode
 from hrtech_etl.core.auth import ApiKeyAuth, BearerAuth
 from hrtech_etl.core.pipeline import pull
 
-from hrtech_etl.connectors.warehouse_a import WarehouseAConnector, WarehouseAActions
-from hrtech_etl.connectors.warehouse_b import WarehouseBConnector, WarehouseBActions
+from hrtech_etl.connectors.warehouse_a import WarehouseAConnector
+from hrtech_etl.connectors.warehouse_b import WarehouseBConnector
 from hrtech_etl.formatters import a_to_b
 
 # --- Instantiate connectors ---
 
 origin = WarehouseAConnector(
-    auth=ApiKeyAuth("X-API-Key", "AAA"),
-    actions=WarehouseAActions(base_url="https://api.warehouse-a", api_key="AAA"),
+    auth=ApiKeyAuth(
+        base_url="https://api.warehouse-a.example",
+        header_name="X-API-Key",
+        api_key="AAA",
+        extra_headers={"X-Tenant-ID": "tenant-123"},
+    )
 )
 
 target = WarehouseBConnector(
-    auth=BearerAuth("BBB"),
-    actions=WarehouseBActions(base_url="https://api.warehouse-b", api_key="BBB"),
+    auth=BearerAuth(
+        base_url="https://api.warehouse-b.com",
+        token="bbb"
+    )
 )
 
 # start from scratch (no cursor yet)

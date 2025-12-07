@@ -12,6 +12,8 @@
     .msg-ok { margin-top:1rem; padding:0.5rem; border:1px solid #0a0; }
     .msg-err { margin-top:1rem; padding:0.5rem; border:1px solid #a00; color:#a00; }
     textarea { width: 100%; min-height: 120px; font-family: monospace; }
+    .auth-field { margin-bottom: 0.5rem; display: block; }
+    .auth-field input { min-width: 260px; }
   </style>
 </head>
 <body>
@@ -110,6 +112,42 @@
         <span>Last cursor end: <code>{{ cursor_end }}</code></span>
       {% endif %}
     </fieldset>
+
+    {% if origin_auth_fields or target_auth_fields %}
+    <fieldset>
+      <legend>Authentication</legend>
+
+      {% if origin_auth_fields %}
+        <h3>Origin auth</h3>
+        {% for f in origin_auth_fields %}
+          <label class="auth-field">
+            {{ (f.ui.label if f.ui and f.ui.label else f.name) }}:
+            <input
+              type="{{ 'password' if f.ui and f.ui.secret else 'text' }}"
+              name="origin_auth_{{ f.name }}"
+              value="{{ f.default if f.default is not none else '' }}"
+              placeholder="{{ f.ui.placeholder if f.ui and f.ui.placeholder else '' }}"
+            />
+          </label>
+        {% endfor %}
+      {% endif %}
+
+      {% if target_auth_fields %}
+        <h3>Target auth</h3>
+        {% for f in target_auth_fields %}
+          <label class="auth-field">
+            {{ (f.ui.label if f.ui and f.ui.label else f.name) }}:
+            <input
+              type="{{ 'password' if f.ui and f.ui.secret else 'text' }}"
+              name="target_auth_{{ f.name }}"
+              value="{{ f.default if f.default is not none else '' }}"
+              placeholder="{{ f.ui.placeholder if f.ui and f.ui.placeholder else '' }}"
+            />
+          </label>
+        {% endfor %}
+      {% endif %}
+    </fieldset>
+    {% endif %}
 
     <fieldset>
       <legend>Mapping (Formatter)</legend>

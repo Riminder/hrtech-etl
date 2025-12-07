@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel
 
+from hrtech_etl.core.auth import BaseAuth
+
 from .models import WarehouseAJob, WarehouseAProfile
 
 
@@ -18,9 +20,34 @@ class WarehouseAActions(BaseModel):
         * concrete HTTP params (dict)
     """
 
-    base_url: str
-    api_key: str
-    headers: Dict[str, str]
+    auth: BaseAuth
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    # Example HTTP helper (pseudo-code)
+    def _get(self, path: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Replace this with real HTTP logic (e.g. requests, httpx).
+        """
+        url = self.auth.build_url(path)
+        headers = self.auth.build_headers()
+        # resp = requests.get(url, headers=headers, params=params)
+        # resp.raise_for_status()
+        # return resp.json()
+        raise NotImplementedError(f"Implement HTTP GET {url} with params={params!r}")
+    
+    def _post(self, path: str, json_body: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Replace this with real HTTP logic (e.g. requests, httpx).
+        """
+        url = self.auth.build_url(path)
+        headers = self.auth.build_headers()
+        # resp = requests.post(url, headers=headers, json=json_body)
+        # resp.raise_for_status()
+        # return resp.json()
+        raise NotImplementedError(f"Implement HTTP POST {url} with body={json_body!r}")
+
 
     # ------------------------------------------------------------------
     # JOBS
@@ -37,16 +64,10 @@ class WarehouseAActions(BaseModel):
           (list_of_jobs, next_cursor_str_or_none)
         """
         # ---- TODO: replace with real HTTP call ----
-        #
-        # import requests
-        # headers = {"Authorization": f"Bearer {self.api_key}"}
-        # resp = requests.get(f"{self.base_url}/jobs", headers=headers, params=params)
-        # resp.raise_for_status()
-        # data = resp.json()
-        # jobs = [WarehouseAJob(**item) for item in data["items"]]
-        # next_cursor = data.get("next_cursor")
-        # return jobs
-        #
+        # data = self._get("/jobs", params=params)
+        # jobs = data.get("jobs", [])  # depends on your API
+        # return [WarehouseAJob(**job) for job in data["jobs"]]
+    
         raise NotImplementedError(f"Implement HTTP GET /jobs with params={params!r}")
 
     def upsert_jobs(self, jobs: List[WarehouseAJob]) -> None:
@@ -75,16 +96,9 @@ class WarehouseAActions(BaseModel):
         Execute a GET /profiles (or equivalent) with the given query params.
         """
         # ---- TODO: replace with real HTTP call ----
-        #
-        # import requests
-        # headers = {"Authorization": f"Bearer {self.api_key}"}
-        # resp = requests.get(f"{self.base_url}/profiles", headers=headers, params=params)
-        # resp.raise_for_status()
-        # data = resp.json()
-        # profiles = [WarehouseAProfile(**item) for item in data["items"]]
-        # next_cursor = data.get("next_cursor")
-        # return profiles
-        #
+        # data = self._get("/profiles", params=params)
+        # profiles = data.get("profiles", [])  # depends on your API
+        # return [WarehouseAProfile(**profile) for profile in data["profiles"]]
         raise NotImplementedError(f"Implement HTTP GET /profiles with params={params!r}")
 
     def upsert_profiles(self, profiles: List[WarehouseAProfile]) -> None:

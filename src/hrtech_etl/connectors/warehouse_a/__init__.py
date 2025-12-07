@@ -50,9 +50,11 @@ class WarehouseAConnector(BaseConnector):
             auth=auth,
             name="warehouse_a",
             warehouse_type=WarehouseType.JOBBOARD,
-            actions=actions,
         )
 
+    def _build_actions(self) -> WarehouseAActions:
+        return WarehouseAActions(auth=self.auth)
+    
     # ------------------------------------------------------------------
     # JOBS: unified ↔ native
     # ------------------------------------------------------------------

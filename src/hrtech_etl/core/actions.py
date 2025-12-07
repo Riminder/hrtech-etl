@@ -1,6 +1,11 @@
 # hrtech_etl/core/actions.py
-from typing import Any, Protocol
+from __future__ import annotations
 
+from typing import Any, Dict, Optional, Protocol
+
+from pydantic import BaseModel
+
+from .auth import BaseAuth
 
 class RequestClient(Protocol):
     """
@@ -58,3 +63,42 @@ class BaseActions:
         """
         self._request_count += 1
         return self._client.request(*args, **kwargs)
+
+
+class BaseHTTPActions(BaseModel):
+    """
+    Base class for HTTP-based actions.
+
+    - Holds a BaseAuth
+    - Provides convenience _get / _post methods
+    - You override or extend per connector if needed
+    """
+
+    auth: BaseAuth
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    def _get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Replace this with real HTTP logic (e.g. requests, httpx).
+        """
+        url = self.auth.build_url(path)
+        headers = self.auth.build_headers()
+        # import requests
+        # resp = requests.get(url, headers=headers, params=params or {})
+        # resp.raise_for_status()
+        # return resp.json()
+        raise NotImplementedError(f"Implement HTTP GET {url} with params={params!r}")
+
+    def _post(self, path: str, json_body: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Replace this with real HTTP logic (e.g. requests, httpx).
+        """
+        url = self.auth.build_url(path)
+        headers = self.auth.build_headers()
+        # import requests
+        # resp = requests.post(url, headers=headers, json=json_body)
+        # resp.raise_for_status()
+        # return resp.json()
+        raise NotImplementedError(f"Implement HTTP POST {url} with body={json_body!r}")
