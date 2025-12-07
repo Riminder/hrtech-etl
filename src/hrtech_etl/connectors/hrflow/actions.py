@@ -9,6 +9,11 @@ from hrtech_etl.connectors.hrflow.models import (
     WarehouseHrflowJob,
     WarehouseHrflowProfile,
 )
+<<<<<<< HEAD
+=======
+from hrtech_etl.core.types import Cursor, CursorMode
+from hrtech_etl.core.utils import get_cursor_native_value
+>>>>>>> 99ea15725f3c7536a21f400012294505b2074db3
 
 
 class WarehouseHrflowActions(BaseModel):

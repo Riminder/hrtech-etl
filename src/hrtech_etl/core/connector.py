@@ -10,7 +10,8 @@ from .types import Condition, CursorMode, Resource, WarehouseType, Cursor, Opera
 from .utils import (
     build_cursor_query_params,
     build_eq_query_params, 
-    build_search_query_params
+    build_search_query_params,
+    get_cursor_native_value
 )
 
 class BaseConnector(ABC):
@@ -221,6 +222,32 @@ class BaseConnector(ABC):
             )
         else:
             raise ValueError(f"Unsupported resource: {resource}")
+    
+    def _finalize_read_batch(
+        self,
+        resources: List[BaseModel],
+        cursor: Cursor,
+    ) -> Tuple[List[BaseModel], Optional[str]]:
+        """
+        Shared helper for read_resources_batch implementations.
+
+        Behavior:
+          - If no items were returned:
+              * return an empty list
+              * keep the previous cursor.start as next_cursor (no progress)
+          - Else:
+              * compute next_cursor from the last item using cursor.mode
+              * return (items, next_cursor)
+        """
+        if not resources:
+            # No data but we keep current start as the "last known" cursor
+            return [], cursor.start
+
+        next_cursor = get_cursor_native_value(
+            resource=resources[-1],      # last native object of the batch
+            cursor_mode=cursor.mode, # which field to use (id / created_at / updated_at)
+        )
+        return resources, next_cursor
 
     def write_resources_batch(
         self,
