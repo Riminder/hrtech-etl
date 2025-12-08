@@ -4,6 +4,8 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Protocol
 
 from pydantic import BaseModel
+import requests
+
 
 from .auth import BaseAuth
 
@@ -85,11 +87,7 @@ class BaseHTTPActions(BaseModel):
         """
         url = self.auth.build_url(path)
         headers = self.auth.build_headers()
-        # import requests
-        # resp = requests.get(url, headers=headers, params=params or {})
-        # resp.raise_for_status()
-        # return resp.json()
-        raise NotImplementedError(f"Implement HTTP GET {url} with params={params!r}")
+        return requests.get(url, headers=headers, params=params or {})
 
     def _post(self, path: str, json_body: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -97,8 +95,8 @@ class BaseHTTPActions(BaseModel):
         """
         url = self.auth.build_url(path)
         headers = self.auth.build_headers()
-        # import requests
+        return requests.post(url, headers=headers, json=json_body)
+        #todo: cleanup example response handling    
         # resp = requests.post(url, headers=headers, json=json_body)
         # resp.raise_for_status()
         # return resp.json()
-        raise NotImplementedError(f"Implement HTTP POST {url} with body={json_body!r}")
