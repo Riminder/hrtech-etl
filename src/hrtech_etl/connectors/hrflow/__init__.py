@@ -88,15 +88,15 @@ class WarehouseHrflowConnector(BaseConnector):
 
     def _write_jobs_native(self, jobs: List[BaseModel]) -> None:
         assert all(isinstance(j, WarehouseHrflowJob) for j in jobs)
-        responses = self.actions.create_jobs(jobs)
-        self.actions.update_jobs(
+        responses = self.actions.update_jobs(jobs)
+        self.actions.create_jobs(
             [job for resp, job in zip(responses, jobs) if resp.status_code == 400]
         )
 
     def write_jobs_batch(self, jobs: List[BaseModel]) -> None:
         assert all(isinstance(j, WarehouseHrflowJob) for j in jobs)
-        responses = self.actions.create_jobs(jobs)
-        self.actions.update_jobs(
+        responses = self.actions.update_jobs(jobs)
+        self.actions.create_jobs(
             [job for resp, job in zip(responses, jobs) if resp.status_code == 400]
         )
 
@@ -148,8 +148,8 @@ class WarehouseHrflowConnector(BaseConnector):
 
     def _write_profiles_native(self, profiles: List[BaseModel]) -> None:
         assert all(isinstance(p, WarehouseHrflowProfile) for p in profiles)
-        responses = self.actions.create_profiles(profiles)
-        self.actions.update_profiles(
+        responses = self.actions.update_profiles(profiles)
+        self.actions.create_profiles(
             [
                 profile
                 for resp, profile in zip(responses, profiles)
@@ -159,8 +159,8 @@ class WarehouseHrflowConnector(BaseConnector):
 
     def write_profiles_batch(self, profiles: List[BaseModel]) -> None:
         assert all(isinstance(p, WarehouseHrflowProfile) for p in profiles)
-        responses = self.actions.create_profiles(profiles)
-        self.actions.update_profiles(
+        responses = self.actions.update_profiles(profiles)
+        self.actions.create_profiles(
             [
                 profile
                 for resp, profile in zip(responses, profiles)
