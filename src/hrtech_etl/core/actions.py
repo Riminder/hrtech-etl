@@ -96,7 +96,12 @@ class BaseHTTPActions(BaseModel):
         url = self.auth.build_url(path)
         headers = self.auth.build_headers()
         return requests.post(url, headers=headers, json=json_body)
-        #todo: cleanup example response handling    
-        # resp = requests.post(url, headers=headers, json=json_body)
-        # resp.raise_for_status()
-        # return resp.json()
+ 
+    def _put(self, path: str, json_body: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Replace this with real HTTP logic (e.g. requests, httpx).
+        """
+        url = self.auth.build_url(path)
+        headers = self.auth.build_headers()
+        return requests.put(url, headers=headers, json=json_body)
+
