@@ -88,12 +88,13 @@ class WarehouseHrflowConnector(BaseConnector):
 
     def _write_jobs_native(self, jobs: List[BaseModel]) -> None:
         assert all(isinstance(j, WarehouseHrflowJob) for j in jobs)
-        self.actions.create_jobs(jobs)  # type: ignore[arg-type]
+        responses = self.actions.create_jobs(jobs)
+        self.actions.update_jobs(
+            [job for resp, job in zip(responses, jobs) if resp.status_code == 400]
+        )
 
-    def write_jobs_batch(self, jobs: List[WarehouseHrflowJob]) -> None:
-        """
-        High-level write for jobs.
-        """
+    def write_jobs_batch(self, jobs: List[BaseModel]) -> None:
+        assert all(isinstance(j, WarehouseHrflowJob) for j in jobs)
         responses = self.actions.create_jobs(jobs)
         self.actions.update_jobs(
             [job for resp, job in zip(responses, jobs) if resp.status_code == 400]
@@ -147,9 +148,17 @@ class WarehouseHrflowConnector(BaseConnector):
 
     def _write_profiles_native(self, profiles: List[BaseModel]) -> None:
         assert all(isinstance(p, WarehouseHrflowProfile) for p in profiles)
-        self.actions.upsert_profiles(profiles)  # type: ignore[arg-type]
+        responses = self.actions.create_profiles(profiles)
+        self.actions.update_profiles(
+            [
+                profile
+                for resp, profile in zip(responses, profiles)
+                if resp.status_code == 400
+            ]
+        )
 
-    def write_profiles_batch(self, profiles: List[WarehouseHrflowProfile]) -> None:
+    def write_profiles_batch(self, profiles: List[BaseModel]) -> None:
+        assert all(isinstance(p, WarehouseHrflowProfile) for p in profiles)
         responses = self.actions.create_profiles(profiles)
         self.actions.update_profiles(
             [
@@ -215,8 +224,7 @@ def _build_default_connector() -> WarehouseHrflowConnector:
             "X-API-User-Email": "dummy@example.com",
         },
     )
-    actions = WarehouseHrflowActions(auth=auth)
-    return WarehouseHrflowConnector(actions=actions)
+    return WarehouseHrflowConnector(auth=auth)
 
 
 register_connector(
