@@ -28,14 +28,17 @@ from .models import (
 class WarehouseHrflowConnector(BaseConnector):
     job_native_cls = WarehouseHrflowJob
     profile_native_cls = WarehouseHrflowProfile
+    sort_param_name = "updated_at"
 
-    def __init__(self, auth: BaseAuth, actions: WarehouseHrflowActions) -> None:
+    def __init__(self, auth: BaseAuth) -> None:
         super().__init__(
             auth=auth,
             name="warehouse_hrflow",
             warehouse_type=WarehouseType.CUSTOMERS,
-            actions=actions,
         )
+
+    def _build_actions(self) -> WarehouseHrflowActions:
+        return WarehouseHrflowActions(auth=self.auth)
 
     # ------------------------------------------------------------------
     # JOBS: unified ↔ native
@@ -85,7 +88,16 @@ class WarehouseHrflowConnector(BaseConnector):
 
     def _write_jobs_native(self, jobs: List[BaseModel]) -> None:
         assert all(isinstance(j, WarehouseHrflowJob) for j in jobs)
-        self.actions.upsert_jobs(jobs)  # type: ignore[arg-type]
+        self.actions.create_jobs(jobs)  # type: ignore[arg-type]
+
+    def write_jobs_batch(self, jobs: List[WarehouseHrflowJob]) -> None:
+        """
+        High-level write for jobs.
+        """
+        responses = self.actions.create_jobs(jobs)
+        self.actions.update_jobs(
+            [job for resp, job in zip(responses, jobs) if resp.status_code == 400]
+        )
 
     def get_job_id(self, native_job: BaseModel) -> str:
         assert isinstance(native_job, WarehouseHrflowJob)
@@ -136,6 +148,16 @@ class WarehouseHrflowConnector(BaseConnector):
     def _write_profiles_native(self, profiles: List[BaseModel]) -> None:
         assert all(isinstance(p, WarehouseHrflowProfile) for p in profiles)
         self.actions.upsert_profiles(profiles)  # type: ignore[arg-type]
+
+    def write_profiles_batch(self, profiles: List[WarehouseHrflowProfile]) -> None:
+        responses = self.actions.create_profiles(profiles)
+        self.actions.update_profiles(
+            [
+                profile
+                for resp, profile in zip(responses, profiles)
+                if resp.status_code == 400
+            ]
+        )
 
     def get_profile_id(self, native_profile: BaseModel) -> str:
         assert isinstance(native_profile, WarehouseHrflowProfile)
