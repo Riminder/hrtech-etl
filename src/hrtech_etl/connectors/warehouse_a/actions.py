@@ -6,48 +6,21 @@ from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel
 
 from hrtech_etl.core.auth import BaseAuth
+from hrtech_etl.core.actions import BaseHTTPActions
 
 from .models import WarehouseAJob, WarehouseAProfile
 
 
-class WarehouseAActions(BaseModel):
+class WarehouseAActions(BaseHTTPActions):
     """
     Low-level client for Warehouse A (HTTP, DB, SDK, ...).
+    Uses BaseHTTPActions._get/_post + build_connector_params.
 
     - NO knowledge of Conditions, Cursor, or unified models.
     - Only deals with:
         * native models (WarehouseAJob / WarehouseAProfile)
         * concrete HTTP params (dict)
     """
-
-    auth: BaseAuth
-
-    class Config:
-        arbitrary_types_allowed = True
-
-    # Example HTTP helper (pseudo-code)
-    def _get(self, path: str, params: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Replace this with real HTTP logic (e.g. requests, httpx).
-        """
-        url = self.auth.build_url(path)
-        headers = self.auth.build_headers()
-        # resp = requests.get(url, headers=headers, params=params)
-        # resp.raise_for_status()
-        # return resp.json()
-        raise NotImplementedError(f"Implement HTTP GET {url} with params={params!r}")
-    
-    def _post(self, path: str, json_body: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Replace this with real HTTP logic (e.g. requests, httpx).
-        """
-        url = self.auth.build_url(path)
-        headers = self.auth.build_headers()
-        # resp = requests.post(url, headers=headers, json=json_body)
-        # resp.raise_for_status()
-        # return resp.json()
-        raise NotImplementedError(f"Implement HTTP POST {url} with body={json_body!r}")
-
 
     # ------------------------------------------------------------------
     # JOBS

@@ -219,38 +219,9 @@ def _load_callable(path: str) -> Callable[..., Any]:
     module = import_module(module_name)
     return getattr(module, attr)
 
-from hrtech_etl.core.auth import BaseAuth, ApiKeyAuth, BearerAuth, TokenAuth
-
-_AUTH_KINDS = {
-    "api_key": ApiKeyAuth,
-    "bearer": BearerAuth,
-    "token": TokenAuth,
-}
+from hrtech_etl.core.auth import build_auth_from_payload
 
 
-def build_auth_from_payload(
-    auth_payload: dict[str, Any],
-    default_auth: BaseAuth,
-) -> BaseAuth:
-    """
-    Build a concrete auth object from JSON payload.
-
-    If 'auth_type' is present, we use it to select the subclass.
-    Otherwise we fall back to the default_auth's class.
-    """
-    if not auth_payload:
-        return default_auth
-
-    auth_type = auth_payload.get("auth_type") or auth_payload.get("type")
-    if auth_type:
-        auth_cls = _AUTH_KINDS.get(auth_type)
-        if auth_cls is None:
-            raise ValueError(f"Unknown auth_type: {auth_type!r}")
-    else:
-        auth_cls = type(default_auth)
-
-    # Pydantic v2
-    return auth_cls.model_validate(auth_payload)
 
 
 class ResourcePullConfig(BaseModel):

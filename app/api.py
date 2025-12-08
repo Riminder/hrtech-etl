@@ -9,9 +9,12 @@ from hrtech_etl.core.registry import (
     list_connectors,
     get_connector_instance,
 )
-from hrtech_etl.core.ui_schema import export_model_fields
+from hrtech_etl.core.ui_schema import (
+    export_model_fields,
+    export_auth_fields,  
+)
 from hrtech_etl.core.models import UnifiedJob, UnifiedProfile
-from hrtech_etl.core.types import Resource, PushMode, Condition , Cursor
+from hrtech_etl.core.types import Resource, PushMode, Condition, Cursor
 from hrtech_etl.core.pipeline import (
     pull,
     push,
@@ -20,15 +23,13 @@ from hrtech_etl.core.pipeline import (
     ResourcePullConfig,
     ResourcePushConfig,
 )
-
-from hrtech_etl.core.utils import build_connector_params 
+from hrtech_etl.core.utils import build_connector_params
 from hrtech_etl.formatters.base import FORMATTER_REGISTRY, build_mapping_formatter
-
-
 
 router = APIRouter()
 
 # ---------- CONNECTOR METADATA & SCHEMA ----------
+
 
 @router.get("/connectors")
 def connectors():
@@ -92,24 +93,52 @@ def unified_fields(
     return export_model_fields(model_cls, only_prefilterable=only_prefilterable)
 
 
+@router.get("/schema/auth/{connector_name}")
+def connector_auth_schema(connector_name: str):
+    """
+    Expose the auth schema for a given connector.
+
+    The schema is derived from the connector's auth Pydantic model, via
+    `export_auth_fields(...)`, and is intended for UI / clients that want to
+    dynamically render the right auth params (base_url, api_key, token, extra headers, ...).
+
+    Example:
+      /api/schema/auth/warehouse_a
+    """
+    try:
+        connector = get_connector_instance(connector_name)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Unknown connector")
+
+    auth = getattr(connector, "auth", None)
+    if auth is None:
+        # connector does not require auth or builds it internally
+        return []
+
+    auth_cls = type(auth)
+    return export_auth_fields(auth_cls)
+
+
 @router.post("/run/pull")
 def run_pull(cfg: ResourcePullConfig):
     """
-    Run a job pull based on a JSON config built in the UI.
+    Run a job/profile pull based on a JSON config built in the UI.
     """
     cursor = run_resource_pull_from_config(cfg)
     return cursor.model_dump()
 
+
 @router.post("/run/push")
 def run_push(cfg: ResourcePushConfig):
     """
-    Run a job push based on a JSON config built in the UI.
+    Run a job/profile push based on a JSON config built in the UI.
     """
     result = run_resource_push_from_config(cfg)
     return result.model_dump()
 
 
 # ---------- FORMATTER BUILDING (MAPPING-BASED) ----------
+
 
 class MappingItem(BaseModel):
     from_field: str = Field(alias="from")
@@ -143,7 +172,6 @@ def build_formatter_route(req: BuildFormatterRequest):
     """
     formatter_id = str(uuid4())
 
-    # FORMATTER_REGISTRY is imported from hrtech_etl.formatters.base
     FORMATTER_REGISTRY[formatter_id] = {
         "resource": req.resource,
         "origin": req.origin,
@@ -185,7 +213,9 @@ def get_formatter_route(formatter_id: str):
         mapping=mapping,
     )
 
+
 # ---------- RUN PULL / PUSH WITH formatter_id ----------
+
 
 class RunPullWithFormatterRequest(BaseModel):
     formatter_id: str
@@ -208,19 +238,20 @@ def run_pull_with_formatter(body: RunPullWithFormatterRequest):
 
     cfg = body.cfg
 
-    # sanity check – optional, but useful to avoid mismatches
     if fmt_info["resource"] != cfg.resource:
         raise HTTPException(
             status_code=400,
-            detail=f"Formatter resource={fmt_info['resource']} "
-                   f"does not match cfg.resource={cfg.resource}",
+            detail=(
+                f"Formatter resource={fmt_info['resource']} "
+                f"does not match cfg.resource={cfg.resource}"
+            ),
         )
 
     resource = Resource(cfg.resource)
     origin = get_connector_instance(cfg.origin)
     target = get_connector_instance(cfg.target)
 
-    mapping = fmt_info["mapping"]  # list[{"from": "...", "to": "..."}]
+    mapping = fmt_info["mapping"]
     formatter = build_mapping_formatter(mapping)
 
     cursor = pull(
@@ -261,8 +292,10 @@ def run_push_with_formatter(body: RunPushWithFormatterRequest):
     if fmt_info["resource"] != cfg.resource:
         raise HTTPException(
             status_code=400,
-            detail=f"Formatter resource={fmt_info['resource']} "
-                   f"does not match cfg.resource={cfg.resource}",
+            detail=(
+                f"Formatter resource={fmt_info['resource']} "
+                f"does not match cfg.resource={cfg.resource}"
+            ),
         )
 
     resource = Resource(cfg.resource)
@@ -270,7 +303,7 @@ def run_push_with_formatter(body: RunPushWithFormatterRequest):
     target = get_connector_instance(cfg.target)
     mode = PushMode(cfg.mode)
 
-    mapping = fmt_info["mapping"]  # list[{"from": "...", "to": "..."}]
+    mapping = fmt_info["mapping"]
     formatter = build_mapping_formatter(mapping)
 
     result = push(
@@ -287,7 +320,9 @@ def run_push_with_formatter(body: RunPushWithFormatterRequest):
     )
     return result.model_dump()
 
-## ---------- DEBUG CONNECTOR PARAMS ----------
+
+# ---------- DEBUG CONNECTOR PARAMS ----------
+
 
 class DebugConnectorParamsRequest(BaseModel):
     connector: str
@@ -326,16 +361,12 @@ def debug_connector_params(body: DebugConnectorParamsRequest):
     except KeyError:
         raise HTTPException(status_code=404, detail="Unknown connector")
 
-    # pick native model class
     if body.resource == "job":
         resource_cls = connector.job_native_cls
     else:
         resource_cls = connector.profile_native_cls
 
-    # if not provided, default to the unified cursor field name
     sort_by_unified = body.sort_by_unified or body.cursor.mode.value
-
-    # connector may expose sort_param_name (like WarehouseAConnector.sort_param_name = "order")
     sort_param_name = getattr(connector, "sort_param_name", None)
 
     params = build_connector_params(
@@ -353,37 +384,3 @@ def debug_connector_params(body: DebugConnectorParamsRequest):
         sort_param_name=sort_param_name,
         params=params,
     )
-
-
-from hrtech_etl.core.auth import BaseAuth, ApiKeyAuth, BearerAuth, TokenAuth
-
-_AUTH_KINDS = {
-    "api_key": ApiKeyAuth,
-    "bearer": BearerAuth,
-    "token": TokenAuth,
-}
-
-
-def build_auth_from_payload(
-    auth_payload: dict[str, Any],
-    default_auth: BaseAuth,
-) -> BaseAuth:
-    """
-    Build a concrete auth object from JSON payload.
-
-    If 'auth_type' is present, we use it to select the subclass.
-    Otherwise we fall back to the default_auth's class.
-    """
-    if not auth_payload:
-        return default_auth
-
-    auth_type = auth_payload.get("auth_type") or auth_payload.get("type")
-    if auth_type:
-        auth_cls = _AUTH_KINDS.get(auth_type)
-        if auth_cls is None:
-            raise ValueError(f"Unknown auth_type: {auth_type!r}")
-    else:
-        auth_cls = type(default_auth)
-
-    # Pydantic v2
-    return auth_cls.model_validate(auth_payload)
